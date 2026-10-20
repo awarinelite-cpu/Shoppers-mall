@@ -13,11 +13,12 @@
   let loaded = id === null;
   let name = '', alt = '', internal = '', category = '', cost = '', price = '', stock = '0', low = S('low_default', '5'), unit = 'PIECE';
   let supplier = '', description = '', expiry = '', scanning = false;
-  let photoUrl: string | undefined, pending = '', fileEl: HTMLInputElement, shrinking = false;
+  let photoUrl: string | undefined, pending = '', fileEl: HTMLInputElement, camEl: HTMLInputElement, shrinking = false;
   $: hostingReady = !!($settings?.photo_cloud && $settings?.photo_preset);
   $: preview = pending || (photoUrl ? photoSrc(photoUrl, 400) : '');
-  async function pickPhoto() {
-    const f = fileEl.files?.[0]; fileEl.value = ''; if (!f) return;
+  async function pickPhoto(e: Event) {
+    const el = e.currentTarget as HTMLInputElement;
+    const f = el.files?.[0]; el.value = ''; if (!f) return;
     shrinking = true; const r = await safe(() => shrinkImage(f)); shrinking = false; if (r) pending = r;
   }
   function clearPhoto() { pending = ''; photoUrl = undefined; }
@@ -53,9 +54,11 @@
     <label for="ph">Photo (optional)</label>
     {#if preview}<img class="photo" src={preview} alt="Product" crossorigin="anonymous" />{/if}
     {#if hostingReady}
-      <div class="row"><button class="sm" disabled={shrinking} on:click={() => fileEl.click()}>{shrinking ? 'Preparing…' : preview ? '📷 Change photo' : '📷 Take / choose photo'}</button>
-        {#if preview}<button class="sm" on:click={clearPhoto}>Remove</button>{/if}</div>
+      <div class="row"><button class="sm" disabled={shrinking} on:click={() => camEl.click()}>{shrinking ? 'Preparing…' : '📷 Take photo'}</button>
+        <button class="sm" disabled={shrinking} on:click={() => fileEl.click()}>🖼️ Choose from gallery</button></div>
+      {#if preview}<div class="row"><button class="sm" on:click={clearPhoto}>Remove photo</button></div>{/if}
       <input id="ph" bind:this={fileEl} type="file" accept="image/*" style="display:none" on:change={pickPhoto} />
+      <input bind:this={camEl} type="file" accept="image/*" capture="environment" style="display:none" on:change={pickPhoto} />
       {#if pending}<p class="hint">The photo uploads when you tap Save product (or later, if you are offline).</p>{/if}
     {:else}
       <p class="hint">To add photos, first set up photo hosting: <a href="#/settings" on:click|preventDefault={() => go('/settings')}>Settings › Product photos</a> (free, one time).</p>
