@@ -4,10 +4,13 @@
   import { report } from '../lib/repo';
   import { dayRange, fmtMoney, fmtQty, fmtDateTime } from '../lib/money';
   import { settings, go } from '../lib/stores';
+  import { syncStatus, syncLabel, pendingCount } from '../lib/sync';
   import Header from '../views/Header.svelte';
 
   const today = liveQuery(() => { const [f, t] = dayRange(0); return report(f, t); });
   const products = liveQuery(() => db.products.toArray());
+  const pending = liveQuery(() => pendingCount());
+  $: cloud = $settings?.sync_enabled === '1' ? syncLabel($syncStatus, $pending ?? 0) : '';
   const recent = liveQuery(() => db.sales.orderBy('createdAt').reverse().limit(5).toArray());
   $: active = ($products ?? []).filter((p) => p.active);
   $: out = active.filter((p) => p.stockMilli <= 0).length;
@@ -15,6 +18,7 @@
 </script>
 <Header title={$settings?.store_name || 'Provision POS'} canBack={false} />
 <main>
+  {#if cloud}<button class="sm" style="align-self:flex-end;margin-bottom:6px" on:click={() => go('/settings')}>☁ {cloud}</button>{/if}
   <div class="grid2">
     <button class="btn" on:click={() => go('/sale?scan=1')}>📷 Scan & sell</button>
     <button class="btn alt" on:click={() => go('/product/new')}>＋ Add product</button>

@@ -41,3 +41,16 @@ Settings > Google Drive backup. Enter your Drive email + a Google OAuth **Client
 add your email as a Test user). The app uploads to a folder it creates, "Provision POS Backups", using the `drive.file` scope (it can only see files it created). It cannot upload into a
 folder you made by hand. Sign-in tokens last about 1 hour and there is no server to refresh them, so the daily upload runs when you tap Start (Google may flash a sign-in window).
 Tested only against a simulated Drive API in unit tests; not tested against real Google.
+
+## Cloud sync (Firebase) — several phones, still offline-first
+
+Every phone keeps its own full database and works with no network. Changes are marked automatically and uploaded when a connection exists;
+changes from other phones are downloaded and merged. Set it up in **Settings > Cloud sync** (the steps and the Firestore rules are shown there).
+
+Layout: `users/{uid}/{products|sales|movements|settings}/{id}`; every phone signs in to the same email/password account.
+
+Merge rules (`src/lib/sync.ts`): sales and stock movements are added once (by uid); stock is the sum of movements, so two phones selling at once add up;
+product details: latest edit wins; a refund wins over "completed" and is applied once even if done on two phones; if two phones register the same barcode
+while apart, the older product keeps it. Receipt numbers carry a 3-letter phone code (`POS-K7Q-000012`) so phones never clash.
+Known limit: if two phones sell the last unit at the same moment, stock can end at -1 after syncing.
+Restoring a backup file is blocked while sync is on (the cloud is the backup); turn sync off first if you really need it.

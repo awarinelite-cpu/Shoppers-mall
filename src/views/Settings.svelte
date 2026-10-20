@@ -7,6 +7,7 @@
   import { download, shareFile } from '../lib/receipt';
   import { backupToDrive, listDriveBackups, downloadDriveBackup, folderLink, resetDriveSession, type DriveFile } from '../lib/drive';
   import Header from './Header.svelte';
+  import SyncForm from './SyncForm.svelte';
 
   let name = S('store_name'), address = S('address'), phone = S('phone'), cashier = S('cashier'), footer = S('footer'), prefix = S('receipt_prefix', 'POS');
   let low = S('low_default', '5'), tax = String((parseInt(S('tax_bps', '0')) || 0) / 100), pay = S('default_pay', 'CASH'), allowNeg = S('allow_negative') === '1';
@@ -89,6 +90,9 @@
   <label for="i">Default payment method</label><select id="i" bind:value={pay}>{#each Object.entries(METHODS) as [k, v]}<option value={k}>{v}</option>{/each}</select>
   <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" bind:checked={allowNeg} /> Allow selling below zero stock</label>
   <button class="btn" on:click={save}>Save settings</button>
+
+  <h3>Cloud sync (Firebase)</h3>
+  <SyncForm />
 
   <h3>Google Drive backup</h3>
   <p class="hint">Backups go straight to your Google Drive (folder “Provision POS Backups”), not to the phone. Needs internet at backup time.</p>

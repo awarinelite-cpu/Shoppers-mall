@@ -5,7 +5,15 @@ const now = () => Date.now();
 
 // ---------- settings ----------
 export const getSetting = async (k: string) => (await db.settings.get(k))?.value;
-export const setSettings = (m: Record<string, string>) => db.settings.bulkPut(Object.entries(m).map(([key, value]) => ({ key, value })));
+/** Settings shared by every phone on the same cloud account. Other keys (cashier name, Drive link, counters) stay per phone. */
+export const SHARED_SETTINGS = ['store_name', 'address', 'phone', 'footer', 'receipt_prefix', 'low_default', 'tax_bps', 'default_pay', 'allow_negative', 'setup_done'];
+export async function setSettings(m: Record<string, string>) {
+  const entries = Object.entries(m).map(([key, value]) => ({ key, value }));
+  const mine = (await db.settings.bulkGet(SHARED_SETTINGS)).filter(Boolean);
+  const changed = entries.some((e) => SHARED_SETTINGS.includes(e.key) && mine.find((x) => x!.key === e.key)?.value !== e.value);
+  if (changed) entries.push({ key: 'shared_at', value: String(now()) }, { key: 'shared_dirty', value: '1' });
+  return db.settings.bulkPut(entries);
+}
 
 // ---------- products ----------
 export async function findByCode(code: string): Promise<Product | undefined> {
@@ -86,7 +94,8 @@ export function completeSale(req: SaleRequest): Promise<Sale> {
     const counter = (parseInt((await getSetting('receipt_counter')) ?? '0') || 0) + 1;
     await db.settings.put({ key: 'receipt_counter', value: String(counter) });
     const prefix = (await getSetting('receipt_prefix')) || 'POS';
-    const receiptNo = `${prefix}-${String(counter).padStart(6, '0')}`;
+    const dc = await getSetting('device_code');            // present once cloud sync was set up: keeps receipt numbers of different phones apart
+    const receiptNo = `${prefix}-${dc ? dc + '-' : ''}${String(counter).padStart(6, '0')}`;
     const sale: Sale = { receiptNo, clientToken: req.token, createdAt: t, subtotal: tot.subtotal, discount: tot.discount, tax: tot.tax, total: tot.total,
       tendered: st.tendered, changeDue: st.change, status: 'COMPLETED', paymentStatus: 'PAID',
       methods: [...new Set(st.applied.map((a) => a.method))].join(','), cashier: req.cashier };
@@ -118,7 +127,8 @@ export function refund(id: number, reason: string) {
       const p = it.productId != null ? await db.products.get(it.productId) : undefined; if (!p) continue;
       await db.products.update(p.id!, { stockMilli: p.stockMilli + it.qtyMilli, updatedAt: t });
       await db.movements.add({ productId: p.id!, productName: p.name, type: 'REFUND', changeMilli: it.qtyMilli, prevMilli: p.stockMilli,
-        newMilli: p.stockMilli + it.qtyMilli, reason: `Refund ${s.receiptNo}`, note: reason || undefined, refId: id, createdAt: t });
+        newMilli: p.stockMilli + it.qtyMilli, reason: `Refund ${s.receiptNo}`, note: reason || undefined, refId: id, createdAt: t,
+        uid: `refund-${s.uid}-${p.uid}` });   // same id on every phone: a refund done on two phones restores stock once
     }
     await db.sales.update(id, { status: 'REFUNDED', refundedAt: t, refundReason: reason || undefined });
   });
@@ -159,12 +169,15 @@ export const removeLegacyPin = () => db.settings.bulkDelete(['pin_hash', 'pin_sa
 
 // ---------- backup / restore ----------
 export async function exportBackup(): Promise<string> {
-  return JSON.stringify({ format: 'provision-pos-backup', version: 1, createdAt: now(), products: await db.products.toArray(), sales: await db.sales.toArray(),
-    saleItems: await db.saleItems.toArray(), payments: await db.payments.toArray(), movements: await db.movements.toArray(), settings: await db.settings.toArray() });
+  const clean = <T extends { dirty?: unknown }>(rows: T[]) => rows.map(({ dirty, ...r }) => r);
+  return JSON.stringify({ format: 'provision-pos-backup', version: 1, createdAt: now(), products: clean(await db.products.toArray()), sales: clean(await db.sales.toArray()),
+    saleItems: await db.saleItems.toArray(), payments: await db.payments.toArray(), movements: clean(await db.movements.toArray()), settings: await db.settings.toArray() });
 }
 
 /** Validates, then replaces all data in one transaction. Nothing changes if anything fails. */
 export async function restoreBackup(json: string): Promise<string> {
+  if ((await getSetting('sync_enabled')) === '1')
+    throw new PosError('Cloud sync is on, and the cloud already holds your data. Restoring a file here would clash with it. To get your data back on a phone, use Settings > Cloud sync (it downloads everything). To restore a file anyway, turn cloud sync off first.');
   let b: any;
   const text = json.replace(/^\uFEFF/, '').trim();
   if (!text) throw new PosError('The file is empty (0 bytes). The backup was not saved properly. Export it again.');
@@ -183,7 +196,7 @@ export async function restoreBackup(json: string): Promise<string> {
   if (b.saleItems.some((i: SaleItem) => !sids.has(i.saleId)) || b.payments.some((p: Payment) => !sids.has(p.saleId))) throw new PosError('Backup is inconsistent (items without a sale)');
   if (b.movements.some((m: Movement) => !pids.has(m.productId))) throw new PosError('Backup is inconsistent (stock movement without a product)');
   await takeSnapshot('pre-restore');       // undo point: the data being replaced
-  const keep = (await db.settings.toArray()).filter((x) => x.key.startsWith('drive_') && x.value);   // this device's Google Drive link survives a restore
+  const keep = (await db.settings.toArray()).filter((x) => /^(drive_|sync_|device_)/.test(x.key) && x.value);   // this phone's Drive link and sync link survive a restore
   await db.transaction('rw', [db.products, db.sales, db.saleItems, db.payments, db.movements, db.settings], async () => {
     await Promise.all([db.products.clear(), db.sales.clear(), db.saleItems.clear(), db.payments.clear(), db.movements.clear(), db.settings.clear()]);
     await db.products.bulkAdd(b.products); await db.sales.bulkAdd(b.sales); await db.saleItems.bulkAdd(b.saleItems);

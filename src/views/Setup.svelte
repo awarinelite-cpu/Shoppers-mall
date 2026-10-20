@@ -2,6 +2,7 @@
   import { setSettings } from '../lib/repo';
   import { toast, safe } from '../lib/stores';
   import { parseQty, fmtQty } from '../lib/money';
+  import SyncForm from './SyncForm.svelte';
   let name = '', address = '', phone = '', cashier = '', low = '5';
   async function start() {
     if (!name.trim()) return toast('Enter the store name');
@@ -20,5 +21,6 @@
     <label for="e">Low-stock warning level (units)</label><input id="e" bind:value={low} inputmode="decimal" />
     <button class="btn" on:click={start}>Start</button>
     <p class="hint">Your data stays on this device (offline). Export a backup regularly from Settings.</p>
+    <details class="hint"><summary><b>Already use Provision POS on another phone?</b> Connect cloud sync instead of setting up again</summary><SyncForm compact /></details>
   </main>
 </div>
