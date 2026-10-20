@@ -18,6 +18,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        navigateFallbackDenylist: [/^\/\.well-known\//],   // Android app verification file must never be replaced by the app page
         // product photos already seen stay viewable offline (requested with CORS, so they are not "opaque" and cost no extra quota)
         runtimeCaching: [{ urlPattern: /^https:\/\/res\.cloudinary\.com\//, handler: 'CacheFirst',
           options: { cacheName: 'product-photos', expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 60 }, cacheableResponse: { statuses: [200] } } }]

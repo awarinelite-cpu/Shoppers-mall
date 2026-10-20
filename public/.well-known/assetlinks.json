@@ -1,0 +1,4 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": { "namespace": "android_app", "package_name": "com.provisionpos.app", "sha256_cert_fingerprints": ["40:26:58:05:3D:B0:B7:81:EE:C1:67:2F:51:F2:15:7D:47:B0:D3:43:A1:81:51:3A:63:18:78:07:DE:4D:F6:A6"] }
+}]
