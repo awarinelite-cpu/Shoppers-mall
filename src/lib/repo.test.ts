@@ -42,11 +42,10 @@ describe('repository', () => {
     const a = await sell('same', id, 1000, 100000, 100000), b = await sell('same', id, 1000, 100000, 100000);
     expect(a.id).toBe(b.id); expect(await db.sales.count()).toBe(1); expect((await db.products.get(id))!.stockMilli).toBe(9000);
   });
-  it('insufficient stock is rejected and nothing is saved', async () => {
+  it('selling more than the stock (or at zero stock) is allowed and goes negative', async () => {
     const id = await mk('Sugar', '333', 20000, 2000);
-    await expect(sell('t3', id, 5000, 100000, 100000)).rejects.toThrow(PosError);
-    expect((await db.products.get(id))!.stockMilli).toBe(2000); expect(await db.sales.count()).toBe(0);
-    expect(await repo.getSetting('receipt_counter')).toBeUndefined();
+    await sell('t3', id, 5000, 100000, 100000);
+    expect((await db.products.get(id))!.stockMilli).toBe(-3000); expect(await db.sales.count()).toBe(1);
   });
   it('failed payment validation rolls back everything', async () => {
     const id = await mk('Salt', '334', 20000, 5000);

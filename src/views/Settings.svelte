@@ -11,7 +11,7 @@
   import { processPhotoQueue } from '../lib/photo';
 
   let name = S('store_name'), address = S('address'), phone = S('phone'), cashier = S('cashier'), footer = S('footer'), prefix = S('receipt_prefix', 'POS');
-  let low = S('low_default', '5'), tax = String((parseInt(S('tax_bps', '0')) || 0) / 100), pay = S('default_pay', 'CASH'), allowNeg = S('allow_negative') === '1';
+  let low = S('low_default', '5'), tax = String((parseInt(S('tax_bps', '0')) || 0) / 100), pay = S('default_pay', 'CASH');
   let fileInput: HTMLInputElement;
   let autoBackup = S('auto_backup') !== '0';
   const snaps = liveQuery(() => db.snapshots.orderBy('date').reverse().toArray());
@@ -26,7 +26,7 @@
     if (!name.trim()) return toast('Store name is required');
     if (t === null || t > 100000 || l === null) return toast('Check tax and stock level');
     { const r = await safe(() => setSettings({ store_name: name.trim(), address, phone, cashier, footer, receipt_prefix: prefix.trim() || 'POS',
-      low_default: fmtQty(l), tax_bps: String(Math.round(t / 10)), default_pay: pay, allow_negative: allowNeg ? '1' : '0' })); if (r !== undefined) toast('Settings saved'); }
+      low_default: fmtQty(l), tax_bps: String(Math.round(t / 10)), default_pay: pay, allow_negative: '1' })); if (r !== undefined) toast('Settings saved'); }
   }
   async function backup() { const r = await safe(exportBackup); if (r) { download(`provision-pos-backup-${fmtDate(Date.now())}.json`, r, 'application/json'); await markDailyDownload(); toast('Backup downloaded'); } }
   let photoCloud = S('photo_cloud'), photoPreset = S('photo_preset'), photoBusy = false;
@@ -96,7 +96,6 @@
   <label for="g">Default low-stock level (new products)</label><input id="g" bind:value={low} inputmode="decimal" />
   <label for="h">Tax % (0 = no tax)</label><input id="h" bind:value={tax} inputmode="decimal" />
   <label for="i">Default payment method</label><select id="i" bind:value={pay}>{#each Object.entries(METHODS) as [k, v]}<option value={k}>{v}</option>{/each}</select>
-  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" bind:checked={allowNeg} /> Allow selling below zero stock</label>
   <button class="btn" on:click={save}>Save settings</button>
 
   <h3>Cloud sync (Firebase)</h3>

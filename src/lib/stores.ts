@@ -39,7 +39,7 @@ export const cart = writable<CartLine[]>([]);
 export const discount = writable(0);
 export let token = crypto.randomUUID();
 export const newToken = () => (token = crypto.randomUUID());
-const allowNeg = () => S('allow_negative') === '1';
+const allowNeg = () => true;   // selling at zero/low stock is always allowed
 const taxBps = () => parseInt(S('tax_bps', '0')) || 0;
 
 export function cartTotals(lines: CartLine[], disc: number) {

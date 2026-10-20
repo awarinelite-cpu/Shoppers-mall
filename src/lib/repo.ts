@@ -75,7 +75,7 @@ export function completeSale(req: SaleRequest): Promise<Sale> {
     const existing = await db.sales.where('clientToken').equals(req.token).first();
     if (existing) return existing;                       // idempotent against double taps / retries
     if (!req.lines.length) throw new PosError('The cart is empty');
-    const allowNeg = (await getSetting('allow_negative')) === '1';
+    const allowNeg = true;   // selling at zero/low stock is always allowed
     const taxBps = parseInt((await getSetting('tax_bps')) ?? '0') || 0;
     const t = now();
     const fresh: { p: Product; q: number }[] = [];
