@@ -68,18 +68,11 @@
     <div class="row"><input id="bc" bind:value={barcode} inputmode="numeric" /><button class="sm fit" style="padding:14px" on:click={() => (scanning = true)}>📷</button></div>
     <label for="al">Alternative barcode (optional)</label><input id="al" bind:value={alt} />
     <label for="ic">Internal code (auto if empty)</label><input id="ic" bind:value={internal} />
-    <label for="ca">Category (e.g. Grains, Drinks)</label><input id="ca" bind:value={category} />
-    <div class="row"><div><label for="co">Purchase cost ₦</label><input id="co" bind:value={cost} inputmode="decimal" /></div>
-      <div><label for="pr">Selling price ₦ *</label><input id="pr" bind:value={price} inputmode="decimal" /></div></div>
-    <label for="un">Unit</label><select id="un" bind:value={unit}>{#each Object.entries(UNITS) as [k, v]}<option value={k}>{v}</option>{/each}</select>
+    <label for="pr">Selling price ₦ *</label><input id="pr" bind:value={price} inputmode="decimal" />
     <div class="row">
-      {#if id === null}<div><label for="st">Opening stock</label><input id="st" bind:value={stock} inputmode="decimal" /></div>{/if}
       <div><label for="lo">Low-stock level</label><input id="lo" bind:value={low} inputmode="decimal" /></div>
     </div>
     {#if id !== null}<p class="hint">Change stock with Stock → Adjust so the history stays correct.</p>{/if}
-    <label for="su">Supplier (optional)</label><input id="su" bind:value={supplier} />
-    <label for="ex">Expiry date yyyy-mm-dd (optional)</label><input id="ex" bind:value={expiry} placeholder="2027-06-30" />
-    <label for="de">Description (optional)</label><textarea id="de" rows="2" bind:value={description}></textarea>
     <button class="btn" on:click={save}>Save product</button>
   {/if}
 </main>
