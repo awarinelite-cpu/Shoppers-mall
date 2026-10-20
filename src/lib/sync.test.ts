@@ -213,6 +213,21 @@ describe('two phones, one cloud', () => {
   });
 });
 
+describe('photo links across phones', () => {
+  it('a photo link set on one phone appears on the other, and removing it removes it', async () => {
+    const cloud = new Cloud();
+    const A = await phone(cloud); await A.mk('Rice', '1', 100000, 10000); await A.connect('upload');
+    const B = await phone(cloud); await B.connect('download');
+    await new Promise((r) => setTimeout(r, 5));
+    const url = 'https://res.cloudinary.com/c/image/upload/v1/a.jpg';
+    await A.repo.saveProduct({ ...(await A.byName('Rice')), photoUrl: url }); await A.sync.syncNow(); await B.sync.syncNow();
+    expect((await B.byName('Rice')).photoUrl).toBe(url);
+    await new Promise((r) => setTimeout(r, 5));
+    await B.repo.saveProduct({ ...(await B.byName('Rice')), photoUrl: undefined }); await B.sync.syncNow(); await A.sync.syncNow();
+    expect((await A.byName('Rice')).photoUrl).toBeUndefined();
+  });
+});
+
 describe('Firebase config paste', () => {
   it('reads the block as the console shows it, and rejects an incomplete one', async () => {
     vi.resetModules(); (globalThis as any).__POS_DB_NAME__ = 'cfg-test';

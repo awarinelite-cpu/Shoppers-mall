@@ -129,7 +129,7 @@ export async function pendingCount(): Promise<number> {
 }
 
 // ---------- download / merge ----------
-const FIELDS = ['name', 'barcode', 'altBarcode', 'internalCode', 'category', 'costKobo', 'priceKobo', 'lowThresholdMilli', 'unit', 'supplier', 'description', 'expiryAt', 'active', 'createdAt', 'updatedAt'];
+const FIELDS = ['name', 'barcode', 'altBarcode', 'internalCode', 'category', 'costKobo', 'priceKobo', 'lowThresholdMilli', 'unit', 'supplier', 'description', 'expiryAt', 'active', 'photoUrl', 'createdAt', 'updatedAt'];
 
 /** barcode is unique on a phone. If two phones registered the same code while offline, the older product keeps it on every phone. */
 async function claimBarcode(uid: string, createdAt: number, code: string | undefined): Promise<string | undefined> {
@@ -289,8 +289,8 @@ const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(3)), (
 export async function finishConnect(mode: 'upload' | 'download', config: { text: string; email: string }) {
   if (mode === 'download') {
     if ((await db.products.count()) + (await db.sales.count())) await takeSnapshot('before-sync');
-    await db.transaction('rw', [db.products, db.sales, db.saleItems, db.payments, db.movements, db.settings], async () => {
-      await Promise.all([db.products.clear(), db.sales.clear(), db.saleItems.clear(), db.payments.clear(), db.movements.clear()]);
+    await db.transaction('rw', [db.products, db.sales, db.saleItems, db.payments, db.movements, db.settings, db.photoQueue], async () => {
+      await Promise.all([db.products.clear(), db.sales.clear(), db.saleItems.clear(), db.payments.clear(), db.movements.clear(), db.photoQueue.clear()]);
       await db.settings.bulkDelete([...COLS.map((c) => 'sync_cur_' + c), 'shared_at', 'shared_dirty', 'receipt_counter']);
     });
   } else {

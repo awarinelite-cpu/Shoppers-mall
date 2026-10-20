@@ -1,4 +1,5 @@
 <script lang="ts">
+  const hide = (e: Event) => { (e.currentTarget as HTMLElement).style.display = 'none'; };   // a photo that cannot load (offline, deleted) just disappears
   import { liveQuery } from 'dexie';
   import { db } from '../lib/db';
   import { setActive } from '../lib/repo';
@@ -6,8 +7,10 @@
   import { go, confirmBox, toast } from '../lib/stores';
   import Header from './Header.svelte';
   import MovementRow from './MovementRow.svelte';
+  import { photoSrc } from '../lib/photo';
   export let id: number;
   const p = liveQuery(() => db.products.get(id));
+  const waiting = liveQuery(() => db.photoQueue.get(id));
   const moves = liveQuery(() => db.movements.where('productId').equals(id).reverse().sortBy('createdAt'));
   async function toggle() {
     if ($p?.active) { if (!(await confirmBox('Deactivate product?', 'It will no longer be sellable. Old receipts are not affected.', 'Deactivate'))) return; await setActive(id, false); toast('Product deactivated'); }
@@ -18,6 +21,8 @@
 <main>
   {#if $p}
     <div class="card">
+      {#if $waiting}<img class="photo" src={$waiting.dataUrl} alt={$p.name} /><div class="sub">⏳ Photo waiting to upload (needs internet)</div>
+      {:else if $p.photoUrl}<img class="photo" src={photoSrc($p.photoUrl, null)} alt={$p.name} loading="lazy" crossorigin="anonymous" on:error={hide} />{/if}
       <div class="total">{fmtMoney($p.priceKobo)}</div>
       <div>Purchase cost: {$p.costKobo != null ? fmtMoney($p.costKobo) : 'not set'}</div>
       <div>Stock: <b>{fmtQty($p.stockMilli)} {UNITS[$p.unit]}</b> (low at {fmtQty($p.lowThresholdMilli)})</div>

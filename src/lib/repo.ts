@@ -6,7 +6,7 @@ const now = () => Date.now();
 // ---------- settings ----------
 export const getSetting = async (k: string) => (await db.settings.get(k))?.value;
 /** Settings shared by every phone on the same cloud account. Other keys (cashier name, Drive link, counters) stay per phone. */
-export const SHARED_SETTINGS = ['store_name', 'address', 'phone', 'footer', 'receipt_prefix', 'low_default', 'tax_bps', 'default_pay', 'allow_negative', 'setup_done'];
+export const SHARED_SETTINGS = ['store_name', 'address', 'phone', 'footer', 'receipt_prefix', 'low_default', 'tax_bps', 'default_pay', 'allow_negative', 'setup_done', 'photo_cloud', 'photo_preset'];
 export async function setSettings(m: Record<string, string>) {
   const entries = Object.entries(m).map(([key, value]) => ({ key, value }));
   const mine = (await db.settings.bulkGet(SHARED_SETTINGS)).filter(Boolean);
@@ -197,8 +197,8 @@ export async function restoreBackup(json: string): Promise<string> {
   if (b.movements.some((m: Movement) => !pids.has(m.productId))) throw new PosError('Backup is inconsistent (stock movement without a product)');
   await takeSnapshot('pre-restore');       // undo point: the data being replaced
   const keep = (await db.settings.toArray()).filter((x) => /^(drive_|sync_|device_)/.test(x.key) && x.value);   // this phone's Drive link and sync link survive a restore
-  await db.transaction('rw', [db.products, db.sales, db.saleItems, db.payments, db.movements, db.settings], async () => {
-    await Promise.all([db.products.clear(), db.sales.clear(), db.saleItems.clear(), db.payments.clear(), db.movements.clear(), db.settings.clear()]);
+  await db.transaction('rw', [db.products, db.sales, db.saleItems, db.payments, db.movements, db.settings, db.photoQueue], async () => {
+    await Promise.all([db.products.clear(), db.sales.clear(), db.saleItems.clear(), db.payments.clear(), db.movements.clear(), db.settings.clear(), db.photoQueue.clear()]);
     await db.products.bulkAdd(b.products); await db.sales.bulkAdd(b.sales); await db.saleItems.bulkAdd(b.saleItems);
     await db.payments.bulkAdd(b.payments); await db.movements.bulkAdd(b.movements); await db.settings.bulkAdd(b.settings);
     const c = Math.max(parseInt(b.settings.find((s: any) => s.key === 'receipt_counter')?.value ?? '0') || 0, b.sales.length);

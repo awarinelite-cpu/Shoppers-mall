@@ -49,3 +49,7 @@ pre.receipt { font: 13px/1.35 ui-monospace, Menlo, Consolas, monospace; white-sp
 .scan .acts button { flex: 1; padding: 13px; border-radius: 10px; border: 0; font: inherit; font-weight: 600; }
 .hint { font-size: .8rem; color: var(--mu); margin: 4px 0; }
 @media print { body * { visibility: hidden; } .receipt-wrap, .receipt-wrap * { visibility: visible; } .receipt-wrap { position: absolute; left: 0; top: 0; width: 100%; border: 0 !important; } }
+
+.item.pic { display: flex; gap: 10px; align-items: center; }
+.thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex: none; background: #eee; }
+.photo { display: block; max-width: 100%; max-height: 320px; margin: 4px 0 8px; border-radius: 12px; object-fit: contain; background: #f1f1f1; }

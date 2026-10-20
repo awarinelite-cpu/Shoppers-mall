@@ -8,6 +8,7 @@
   import { backupToDrive, listDriveBackups, downloadDriveBackup, folderLink, resetDriveSession, type DriveFile } from '../lib/drive';
   import Header from './Header.svelte';
   import SyncForm from './SyncForm.svelte';
+  import { processPhotoQueue } from '../lib/photo';
 
   let name = S('store_name'), address = S('address'), phone = S('phone'), cashier = S('cashier'), footer = S('footer'), prefix = S('receipt_prefix', 'POS');
   let low = S('low_default', '5'), tax = String((parseInt(S('tax_bps', '0')) || 0) / 100), pay = S('default_pay', 'CASH'), allowNeg = S('allow_negative') === '1';
@@ -28,6 +29,13 @@
       low_default: fmtQty(l), tax_bps: String(Math.round(t / 10)), default_pay: pay, allow_negative: allowNeg ? '1' : '0' })); if (r !== undefined) toast('Settings saved'); }
   }
   async function backup() { const r = await safe(exportBackup); if (r) { download(`provision-pos-backup-${fmtDate(Date.now())}.json`, r, 'application/json'); await markDailyDownload(); toast('Backup downloaded'); } }
+  let photoCloud = S('photo_cloud'), photoPreset = S('photo_preset'), photoBusy = false;
+  const photoWaiting = liveQuery(() => db.photoQueue.count());
+  async function savePhotoHost() {
+    if (!/^[A-Za-z0-9_-]*$/.test(photoCloud.trim()) || !/^[A-Za-z0-9_.-]*$/.test(photoPreset.trim())) return toast('Cloud name and preset use only letters, numbers, - and _');
+    await setSettings({ photo_cloud: photoCloud.trim(), photo_preset: photoPreset.trim() }); toast('Photo hosting saved');
+  }
+  async function retryPhotos() { photoBusy = true; const r = await processPhotoQueue(); photoBusy = false; toast(r.error ? 'Not uploaded: ' + r.error : r.left ? r.left + ' photo(s) still waiting' : 'All photos uploaded'); }
   let restoreError = '', pasted = '';
   let driveEmail = S('drive_email'), clientId = S('drive_client_id'), driveBusy = false, driveFiles: DriveFile[] | null = null;
   $: driveOn = $settings?.drive_enabled === '1';
@@ -93,6 +101,22 @@
 
   <h3>Cloud sync (Firebase)</h3>
   <SyncForm />
+
+  <h3>Product photos (Cloudinary)</h3>
+  <p class="hint">Photos are uploaded to Cloudinary (free) and only a link is saved in the app, so the app stays small. Other phones on cloud sync get the same photos.</p>
+  <label for="pc">Cloudinary cloud name</label><input id="pc" bind:value={photoCloud} autocapitalize="none" placeholder="e.g. dxyz123abc" />
+  <label for="pp">Upload preset name (unsigned)</label><input id="pp" bind:value={photoPreset} autocapitalize="none" placeholder="e.g. provision_pos" />
+  <button class="btn" on:click={savePhotoHost}>Save photo hosting</button>
+  {#if $photoWaiting}<p class="hint">⏳ {$photoWaiting} photo(s) waiting to upload.</p><button class="btn alt" disabled={photoBusy} on:click={retryPhotos}>{photoBusy ? 'Uploading…' : 'Upload waiting photos now'}</button>{/if}
+  {#if $settings?.photo_error}<div class="card" style="border-color:var(--er)"><b class="err">Photo upload problem</b><pre style="white-space:pre-wrap;word-break:break-word;margin:6px 0 0;font-size:.85rem">{$settings.photo_error}</pre></div>{/if}
+  <details class="hint"><summary>How to get these two values (one time, about 3 minutes)</summary>
+    <ol style="padding-left:18px">
+      <li>Create a free account at cloudinary.com (no card needed).</li>
+      <li>Your <b>cloud name</b> is shown on the dashboard / Settings › API Keys (Product environment).</li>
+      <li>Settings › Upload › Upload presets › <b>Add upload preset</b>. Set <b>Signing mode: Unsigned</b>. You can set a folder (e.g. provision-pos) and allow only image formats. Save.</li>
+      <li>Copy the preset's name into the box above. Menu names may differ slightly; look for “unsigned upload preset”.</li>
+    </ol>
+    <p>An unsigned preset needs no secret key, which is why it is safe inside the app. Anyone who learns both values could upload pictures to your account, so keep them private.</p></details>
 
   <h3>Google Drive backup</h3>
   <p class="hint">Backups go straight to your Google Drive (folder “Provision POS Backups”), not to the phone. Needs internet at backup time.</p>

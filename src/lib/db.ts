@@ -6,6 +6,8 @@ export interface Product {
   supplier?: string; description?: string; expiryAt?: number | null; active: boolean; createdAt: number; updatedAt: number;
   /** Cloud sync: globally unique id, time of the last edit to the product details (not stock), and 1 = waiting to be uploaded. */
   uid?: string; metaAt?: number; dirty?: 1;
+  /** Link to the hosted photo (Cloudinary). Only the link is stored here, never the picture. */
+  photoUrl?: string;
 }
 export interface Sale {
   id?: number; receiptNo: string; clientToken: string; createdAt: number; subtotal: number; discount: number; tax: number; total: number;
@@ -24,12 +26,14 @@ export interface Movement {
   reason: string; note?: string; refId?: number; createdAt: number; uid?: string; dirty?: 1;
 }
 /** Product fields whose change counts as an edit of the product details (stock is synced through movements instead). */
-export const PRODUCT_META = ['name', 'barcode', 'altBarcode', 'internalCode', 'category', 'costKobo', 'priceKobo', 'lowThresholdMilli', 'unit', 'supplier', 'description', 'expiryAt', 'active'];
+export const PRODUCT_META = ['name', 'barcode', 'altBarcode', 'internalCode', 'category', 'costKobo', 'priceKobo', 'lowThresholdMilli', 'unit', 'supplier', 'description', 'expiryAt', 'active', 'photoUrl'];
 export const newUid = () => crypto.randomUUID();
 /** Set by the sync engine; called (debounced there) whenever something becomes waiting to upload. */
 export const syncBus: { kick: (() => void) | null } = { kick: null };
 const stamp = (o: any) => { if (!o.uid) o.uid = newUid(); if (o.dirty === 0) delete o.dirty; else { o.dirty = 1; syncBus.kick?.(); } };
 
+/** A photo taken while offline (or not uploaded yet): kept here, small, until it has been uploaded and replaced by its link. */
+export interface PhotoJob { productId: number; dataUrl: string; at: number }
 export interface Setting { key: string; value: string }
 export interface Snapshot { date: string; createdAt: number; json: string }
 
@@ -41,6 +45,7 @@ class PosDB extends Dexie {
   movements!: Table<Movement, number>;
   settings!: Table<Setting, string>;
   snapshots!: Table<Snapshot, string>;
+  photoQueue!: Table<PhotoJob, number>;
   constructor() {
     super((globalThis as any).__POS_DB_NAME__ ?? 'provision_pos');
     // Add new versions below with .upgrade() when the schema changes; never delete user data.
@@ -63,6 +68,8 @@ class PosDB extends Dexie {
       for (const t of ['products', 'sales', 'movements'])
         await tx.table(t).toCollection().modify((r: any) => { r.uid = r.uid ?? newUid(); r.dirty = 1; if (t === 'products') r.metaAt = r.updatedAt ?? Date.now(); });
     });
+    // v4: product photos waiting to be uploaded
+    this.version(4).stores({ photoQueue: 'productId,at' });
     // Records are marked automatically, so no code path can forget to sync. A record written with dirty: 0 (or a change that
     // carries a `dirty` key) comes from the sync engine itself and is not queued for upload again.
     this.products.hook('creating', (_k, o: any) => { o.metaAt = o.metaAt ?? o.updatedAt ?? Date.now(); stamp(o); });

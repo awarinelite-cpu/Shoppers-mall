@@ -3,7 +3,8 @@
   import { db } from '../lib/db';
   import { saveProduct } from '../lib/repo';
   import { parseMoney, parseQty, fmtQty, moneyInput, fmtDate, parseDate, UNITS } from '../lib/money';
-  import { back, toast, safe, S } from '../lib/stores';
+  import { back, toast, safe, S, settings, go } from '../lib/stores';
+  import { shrinkImage, attachPhoto, photoSrc } from '../lib/photo';
   import Header from './Header.svelte';
   import Scanner from './Scanner.svelte';
 
@@ -12,13 +13,21 @@
   let loaded = id === null;
   let name = '', alt = '', internal = '', category = '', cost = '', price = '', stock = '0', low = S('low_default', '5'), unit = 'PIECE';
   let supplier = '', description = '', expiry = '', scanning = false;
+  let photoUrl: string | undefined, pending = '', fileEl: HTMLInputElement, shrinking = false;
+  $: hostingReady = !!($settings?.photo_cloud && $settings?.photo_preset);
+  $: preview = pending || (photoUrl ? photoSrc(photoUrl, 400) : '');
+  async function pickPhoto() {
+    const f = fileEl.files?.[0]; fileEl.value = ''; if (!f) return;
+    shrinking = true; const r = await safe(() => shrinkImage(f)); shrinking = false; if (r) pending = r;
+  }
+  function clearPhoto() { pending = ''; photoUrl = undefined; }
 
   onMount(async () => {
     if (id === null) return;
     const p = await db.products.get(id); if (!p) return toast('Product not found');
     name = p.name; barcode = p.barcode ?? ''; alt = p.altBarcode ?? ''; internal = p.internalCode; category = p.category;
     cost = p.costKobo != null ? moneyInput(p.costKobo) : ''; price = moneyInput(p.priceKobo); low = fmtQty(p.lowThresholdMilli); unit = p.unit;
-    supplier = p.supplier ?? ''; description = p.description ?? ''; expiry = p.expiryAt ? fmtDate(p.expiryAt) : ''; loaded = true;
+    photoUrl = p.photoUrl; supplier = p.supplier ?? ''; description = p.description ?? ''; expiry = p.expiryAt ? fmtDate(p.expiryAt) : ''; loaded = true;
   });
 
   async function save() {
@@ -30,14 +39,27 @@
     if (st === null || lw === null) return toast('Stock quantities are invalid');
     if (expiry.trim() && ex === null) return toast('Expiry date must be yyyy-mm-dd');
     const doSave = async () => { const r = await safe(() => saveProduct({ id: id ?? undefined, name, barcode, altBarcode: alt, internalCode: internal, category: category.trim(),
-      costKobo: c, priceKobo: pr, stockMilli: id === null ? st : 0, lowThresholdMilli: lw, unit, supplier: supplier || undefined, description: description || undefined, expiryAt: ex }));
-      if (r !== undefined) { toast('Product saved'); back(); } };
+      costKobo: c, priceKobo: pr, stockMilli: id === null ? st : 0, lowThresholdMilli: lw, unit, supplier: supplier || undefined, description: description || undefined, expiryAt: ex, photoUrl }));
+      if (r !== undefined) {
+        toast('Product saved'); back();
+        if (pending) attachPhoto(r, pending).then((x) => toast(x === 'uploaded' ? 'Photo uploaded' : 'Photo saved. It uploads when you are online.'), (e) => toast('Photo not uploaded: ' + (e?.message ?? 'error')));   // in the background
+      } };
     await doSave();
   }
 </script>
 <Header title={id === null ? 'Add product' : 'Edit product'} />
 <main>
   {#if !loaded}<p class="empty">Loading…</p>{:else}
+    <label for="ph">Photo (optional)</label>
+    {#if preview}<img class="photo" src={preview} alt="Product" crossorigin="anonymous" />{/if}
+    {#if hostingReady}
+      <div class="row"><button class="sm" disabled={shrinking} on:click={() => fileEl.click()}>{shrinking ? 'Preparing…' : preview ? '📷 Change photo' : '📷 Take / choose photo'}</button>
+        {#if preview}<button class="sm" on:click={clearPhoto}>Remove</button>{/if}</div>
+      <input id="ph" bind:this={fileEl} type="file" accept="image/*" style="display:none" on:change={pickPhoto} />
+      {#if pending}<p class="hint">The photo uploads when you tap Save product (or later, if you are offline).</p>{/if}
+    {:else}
+      <p class="hint">To add photos, first set up photo hosting: <a href="#/settings" on:click|preventDefault={() => go('/settings')}>Settings › Product photos</a> (free, one time).</p>
+    {/if}
     <label for="n">Product name *</label><input id="n" bind:value={name} />
     <label for="bc">Barcode (leave empty to use an internal code)</label>
     <div class="row"><input id="bc" bind:value={barcode} inputmode="numeric" /><button class="sm fit" style="padding:14px" on:click={() => (scanning = true)}>📷</button></div>

@@ -1,9 +1,11 @@
 <script lang="ts">
+  const hide = (e: Event) => { (e.currentTarget as HTMLElement).style.display = 'none'; };   // a photo that cannot load (offline, deleted) just disappears
   import { liveQuery } from 'dexie';
   import { db } from '../lib/db';
   import { findByCode } from '../lib/repo';
   import { fmtMoney, fmtQty, UNITS } from '../lib/money';
   import { go } from '../lib/stores';
+  import { photoSrc } from '../lib/photo';
   import Header from './Header.svelte';
   import Scanner from './Scanner.svelte';
   const products = liveQuery(() => db.products.orderBy('name').toArray());
@@ -20,9 +22,10 @@
   <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" bind:checked={showInactive} /> Show deactivated</label>
   {#if !list.length}<p class="empty">{$products?.length ? 'No matching products.' : 'No products yet. Tap ＋ to add your first product.'}</p>{/if}
   {#each list as p (p.id)}
-    <div class="item" role="button" tabindex="0" on:click={() => go('/product/' + p.id)} on:keydown={(e) => e.key === 'Enter' && go('/product/' + p.id)}>
-      <div class="t">{p.name}{p.active ? '' : ' (deactivated)'}</div>
-      <div class="sub">{fmtMoney(p.priceKobo)} · {fmtQty(p.stockMilli)} {UNITS[p.unit]} · {p.barcode ?? p.internalCode}</div>
+    <div class="item pic" role="button" tabindex="0" on:click={() => go('/product/' + p.id)} on:keydown={(e) => e.key === 'Enter' && go('/product/' + p.id)}>
+      {#if p.photoUrl}<img class="thumb" src={photoSrc(p.photoUrl, 96)} alt="" loading="lazy" decoding="async" crossorigin="anonymous" on:error={hide} />{/if}
+      <div><div class="t">{p.name}{p.active ? '' : ' (deactivated)'}</div>
+      <div class="sub">{fmtMoney(p.priceKobo)} · {fmtQty(p.stockMilli)} {UNITS[p.unit]} · {p.barcode ?? p.internalCode}</div></div>
     </div>
   {/each}
 </main>

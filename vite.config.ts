@@ -16,7 +16,12 @@ export default defineConfig({
           { src: 'pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,png,svg,ico}'] }
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        // product photos already seen stay viewable offline (requested with CORS, so they are not "opaque" and cost no extra quota)
+        runtimeCaching: [{ urlPattern: /^https:\/\/res\.cloudinary\.com\//, handler: 'CacheFirst',
+          options: { cacheName: 'product-photos', expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 60 }, cacheableResponse: { statuses: [200] } } }]
+      }
     })
   ],
   test: { environment: 'node', setupFiles: ['fake-indexeddb/auto'], include: ['src/**/*.test.ts'] }
