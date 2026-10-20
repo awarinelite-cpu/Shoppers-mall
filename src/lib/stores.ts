@@ -45,11 +45,22 @@ const taxBps = () => parseInt(S('tax_bps', '0')) || 0;
 export function cartTotals(lines: CartLine[], disc: number) {
   return calcTotals(lines.map((l) => lineTotal(l.product.priceKobo, l.qtyMilli)), disc, taxBps());
 }
+/** Why this product can't be added to the cart right now, or null if it can. */
+export function cartBlockReason(p: Product, qty = ONE): string | null {
+  if (!p.active) return `${p.name} is deactivated`;
+  const l = get(cart).find((x) => x.product.id === p.id);
+  const nq = (l ? l.qtyMilli : 0) + qty;
+  if (!allowNeg() && nq > p.stockMilli) {
+    const have = p.stockMilli / 1000;
+    return have <= 0 ? `${p.name} is out of stock (0 in stock). Add stock first.` : `Only ${have} ${UNITS[p.unit]} of ${p.name} in stock`;
+  }
+  return null;
+}
 export function addToCart(p: Product, qty = ONE): boolean {
-  if (!p.active) { toast(`${p.name} is deactivated`); return false; }
+  const why = cartBlockReason(p, qty);
+  if (why) { toast(why); return false; }
   const lines = get(cart); const i = lines.findIndex((l) => l.product.id === p.id);
   const nq = (i >= 0 ? lines[i].qtyMilli : 0) + qty;
-  if (!allowNeg() && nq > p.stockMilli) { toast(`Only ${p.stockMilli / 1000} ${UNITS[p.unit]} of ${p.name} in stock`); return false; }
   cart.set(i >= 0 ? lines.map((l, j) => (j === i ? { product: p, qtyMilli: nq } : l)) : [...lines, { product: p, qtyMilli: nq }]);
   return true;
 }

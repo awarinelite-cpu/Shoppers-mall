@@ -4,7 +4,7 @@
   import { db } from '../lib/db';
   import { findByCode } from '../lib/repo';
   import { fmtMoney, fmtQty, lineTotal, parseMoney, parseQty, UNITS, ONE } from '../lib/money';
-  import { cart, discount, cartTotals, addToCart, setQty, removeLine, clearCart, go, route, confirmBox, promptBox, toast, settings } from '../lib/stores';
+  import { cart, discount, cartTotals, addToCart, cartBlockReason, setQty, removeLine, clearCart, go, route, confirmBox, promptBox, toast, settings } from '../lib/stores';
   import Header from './Header.svelte';
   import Scanner from './Scanner.svelte';
 
@@ -25,7 +25,7 @@
       summary = `Items: ${$cart.length}   Total: ${fmtMoney(cartTotals($cart, $discount).total)}`;
       return { status: `${p.name} · ${fmtMoney(p.priceKobo)} · x${fmtQty(l.qtyMilli)} (stock ${fmtQty(p.stockMilli)})` };
     }
-    return { status: `Could not add ${p.name}` };
+    return { status: cartBlockReason(p) ?? `Could not add ${p.name}` };
   }
   async function editQty(id: number, cur: number, unit: string) {
     const v = await promptBox('Quantity', `Quantity (${UNITS[unit]})`, fmtQty(cur), true); if (v === null) return;
