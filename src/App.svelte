@@ -48,7 +48,7 @@
   $: view = seg[0] ?? 'home';
   $: id = Number(seg[1]);
   $: tab = ['home', 'sale', 'products', 'stock', 'more'].includes(view) && seg.length <= 1;
-  const tabs = [['/', '🏠', 'Home', 'home'], ['/sale', '🏷️', 'Price', 'sale'], ['/products', '📦', 'Products', 'products'], ['/stock', '📊', 'Stock', 'stock'], ['/more', '☰', 'More', 'more']];
+  const tabs = [['/', '🏠', 'Home', 'home'], ['/sale', '🛒', 'Sale', 'sale'], ['/products', '📦', 'Products', 'products'], ['/stock', '📊', 'Stock', 'stock'], ['/more', '☰', 'More', 'more']];
 </script>
 
 {#if $settings === undefined}
