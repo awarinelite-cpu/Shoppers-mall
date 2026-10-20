@@ -154,21 +154,8 @@ export async function report(from: number, to: number): Promise<Report> {
     cogs, uncostedLines: uncosted, grossProfit: uncosted === 0 ? net - cogs : null, refundedCount: refunded.length, refundedTotal: refunded.reduce((a, s) => a + s.total, 0) };
 }
 
-// ---------- PIN ----------
-async function sha(text: string) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-export const hasPin = async () => !!(await getSetting('pin_hash'));
-export async function setPin(pin: string | null) {
-  if (!pin) return setSettings({ pin_hash: '', pin_salt: '' });
-  const salt = crypto.randomUUID();
-  return setSettings({ pin_salt: salt, pin_hash: await sha(salt + pin) });
-}
-export async function checkPin(pin: string) {
-  const h = await getSetting('pin_hash'); if (!h) return true;
-  return (await sha(((await getSetting('pin_salt')) ?? '') + pin)) === h;
-}
+// Owner PIN was removed from the app. Older installs may still hold a stored PIN hash; clear it.
+export const removeLegacyPin = () => db.settings.bulkDelete(['pin_hash', 'pin_salt']);
 
 // ---------- backup / restore ----------
 export async function exportBackup(): Promise<string> {

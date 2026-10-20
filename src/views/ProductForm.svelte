@@ -3,7 +3,7 @@
   import { db } from '../lib/db';
   import { saveProduct } from '../lib/repo';
   import { parseMoney, parseQty, fmtQty, moneyInput, fmtDate, parseDate, UNITS } from '../lib/money';
-  import { back, toast, safe, S, guard } from '../lib/stores';
+  import { back, toast, safe, S } from '../lib/stores';
   import Header from './Header.svelte';
   import Scanner from './Scanner.svelte';
 
@@ -32,7 +32,7 @@
     const doSave = async () => { const r = await safe(() => saveProduct({ id: id ?? undefined, name, barcode, altBarcode: alt, internalCode: internal, category: category.trim(),
       costKobo: c, priceKobo: pr, stockMilli: id === null ? st : 0, lowThresholdMilli: lw, unit, supplier: supplier || undefined, description: description || undefined, expiryAt: ex }));
       if (r !== undefined) { toast('Product saved'); back(); } };
-    if (id === null) await doSave(); else await guard(doSave);
+    await doSave();
   }
 </script>
 <Header title={id === null ? 'Add product' : 'Edit product'} />

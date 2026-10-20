@@ -14,9 +14,6 @@
         <label for="dv">{$dialog.label}</label>
         <!-- svelte-ignore a11y-autofocus -->
         <input id="dv" bind:value={val} inputmode={$dialog.number ? 'decimal' : 'text'} autofocus />
-      {:else if $dialog.kind === 'pin'}
-        <!-- svelte-ignore a11y-autofocus -->
-        <input type="password" inputmode="numeric" bind:value={val} placeholder="PIN" autofocus />
       {/if}
       <div class="row">
         <button class="btn alt" on:click={() => close($dialog?.kind === 'confirm' ? false : null)}>Cancel</button>

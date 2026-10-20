@@ -3,7 +3,7 @@
   import { saleDetail, refund } from '../lib/repo';
   import { db } from '../lib/db';
   import { receiptText } from '../lib/receipt';
-  import { settings, go, promptBox, guard, safe, toast } from '../lib/stores';
+  import { settings, go, promptBox, safe, toast } from '../lib/stores';
   import Header from './Header.svelte';
   export let id: number;
   // re-read when sales change (e.g. after a refund)
@@ -17,7 +17,7 @@
   async function doRefund() {
     const reason = await promptBox('Refund this sale?', 'Reason', '', false, 'The sale stays in history marked REFUNDED and all items return to stock.');
     if (reason === null) return;
-    await guard(async () => { const r = await safe(() => refund(id, reason)); if (r !== undefined) toast('Sale refunded and stock restored'); });
+    const r = await safe(() => refund(id, reason)); if (r !== undefined) toast('Sale refunded and stock restored');
   }
 </script>
 <Header title="Receipt" />

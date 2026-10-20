@@ -23,20 +23,11 @@ export const toastMsg = writable<string | null>(null);
 let tt: ReturnType<typeof setTimeout>;
 export function toast(m: string) { toastMsg.set(m); clearTimeout(tt); tt = setTimeout(() => toastMsg.set(null), 3500); }
 
-type Dlg = { kind: 'confirm' | 'prompt' | 'pin'; title: string; text?: string; label?: string; value?: string; ok: string; number?: boolean; resolve: (v: any) => void };
+type Dlg = { kind: 'confirm' | 'prompt'; title: string; text?: string; label?: string; value?: string; ok: string; number?: boolean; resolve: (v: any) => void };
 export const dialog = writable<Dlg | null>(null);
 export const confirmBox = (title: string, text: string, ok = 'Confirm') => new Promise<boolean>((resolve) => dialog.set({ kind: 'confirm', title, text, ok, resolve }));
 export const promptBox = (title: string, label: string, value = '', number = false, text = '') =>
   new Promise<string | null>((resolve) => dialog.set({ kind: 'prompt', title, label, value, text, ok: 'OK', number, resolve }));
-/** Runs fn after the owner PIN is verified (if a PIN is set). */
-export async function guard(fn: () => void | Promise<void>) {
-  if (await repo.hasPin()) {
-    const pin = await new Promise<string | null>((resolve) => dialog.set({ kind: 'pin', title: 'Owner PIN', ok: 'OK', resolve }));
-    if (pin === null) return;
-    if (!(await repo.checkPin(pin))) return toast('Wrong PIN');
-  }
-  await fn();
-}
 export async function safe<T>(fn: () => Promise<T>): Promise<T | undefined> {
   try { return await fn(); }
   catch (e) { if (e instanceof PosError) toast(e.message); else { console.error(e); toast('Something went wrong. Nothing was changed.'); } }

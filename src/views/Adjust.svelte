@@ -3,7 +3,7 @@
   import { db } from '../lib/db';
   import { adjustStock } from '../lib/repo';
   import { parseQty, parseMoney, fmtQty, UNITS } from '../lib/money';
-  import { back, guard, safe, toast } from '../lib/stores';
+  import { back, safe, toast } from '../lib/stores';
   import Header from './Header.svelte';
   export let id: number;
   const p = liveQuery(() => db.products.get(id));
@@ -14,11 +14,11 @@
     const q = parseQty(qty), c = cost.trim() ? parseMoney(cost) : null;
     if (!q) return toast('Enter a valid quantity');
     if (cost.trim() && c === null) return toast('Invalid cost');
-    await guard(async () => {
+    {
       const plus = type === 'RECEIVED' || type === 'CORRECTION_ADD';
       const r = await safe(() => adjustStock(id, plus ? q : -q, type.startsWith('CORRECTION') ? 'CORRECTION' : type, types.find((t) => t[0] === type)![1], note, c));
       if (r !== undefined) { toast('Stock updated'); back(); }
-    });
+    }
   }
 </script>
 <Header title="Adjust stock" />

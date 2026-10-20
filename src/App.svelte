@@ -19,11 +19,11 @@
   import Cover from './views/Cover.svelte';
   let started = false;
   import { onMount } from 'svelte';
-  import { dailySnapshot, dueDailyDownload, markDailyDownload, exportBackup } from './lib/repo';
+  import { removeLegacyPin, dailySnapshot, dueDailyDownload, markDailyDownload, exportBackup } from './lib/repo';
   import { download } from './lib/receipt';
   import { fmtDate, } from './lib/money';
   import { toast } from './lib/stores';
-  onMount(() => { dailySnapshot().catch(() => {}); });
+  onMount(() => { removeLegacyPin().catch(() => {}); dailySnapshot().catch(() => {}); });
   async function start() {
     started = true; if (location.hash && location.hash !== '#/') go('/');
     // The tap on Start is the user gesture browsers require before a file download.

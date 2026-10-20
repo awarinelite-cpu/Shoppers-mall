@@ -3,7 +3,7 @@
   import { db } from '../lib/db';
   import { setActive } from '../lib/repo';
   import { fmtMoney, fmtQty, fmtDate, fmtDateTime, UNITS } from '../lib/money';
-  import { go, confirmBox, guard, toast } from '../lib/stores';
+  import { go, confirmBox, toast } from '../lib/stores';
   import Header from './Header.svelte';
   import MovementRow from './MovementRow.svelte';
   export let id: number;
@@ -28,7 +28,7 @@
       <div class="sub">Created {fmtDateTime($p.createdAt)} · updated {fmtDateTime($p.updatedAt)}{$p.active ? '' : ' · DEACTIVATED'}</div>
     </div>
     <div class="row">
-      <button class="btn" on:click={() => guard(() => go('/product/' + id + '/edit'))}>Edit</button>
+      <button class="btn" on:click={() => go('/product/' + id + '/edit')}>Edit</button>
       <button class="btn alt" on:click={() => go('/adjust/' + id)}>Adjust stock</button>
     </div>
     <button class="btn alt" on:click={toggle}>{$p.active ? 'Deactivate' : 'Activate'}</button>

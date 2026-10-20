@@ -99,10 +99,10 @@ describe('repository', () => {
     await sell('r-2', b, 1000, 50000, 50000);
     r = await repo.report(0, Date.now() + 1000); expect(r.grossProfit).toBeNull(); expect(r.uncostedLines).toBe(1); expect(r.saleCount).toBe(2);
   });
-  it('PIN set/check', async () => {
-    expect(await repo.hasPin()).toBe(false); await repo.setPin('1234');
-    expect(await repo.hasPin()).toBe(true); expect(await repo.checkPin('1234')).toBe(true); expect(await repo.checkPin('0000')).toBe(false);
-    expect(await repo.getSetting('pin_hash')).not.toContain('1234');
+  it('legacy PIN settings are cleared', async () => {
+    await repo.setSettings({ pin_hash: 'abc', pin_salt: 'x', store_name: 'S' });
+    await repo.removeLegacyPin();
+    expect(await repo.getSetting('pin_hash')).toBeUndefined(); expect(await repo.getSetting('pin_salt')).toBeUndefined(); expect(await repo.getSetting('store_name')).toBe('S');
   });
   it('backup round-trip has no duplicates and receipt numbers continue', async () => {
     const id = await mk('Salt', '555', 10000, 5000); await sell('t6', id, 1000, 10000, 10000);
@@ -154,12 +154,12 @@ describe('repository', () => {
     const t = (await import('./money')).totals([ (await import('./money')).lineTotal(120000, 2500), (await import('./money')).lineTotal(35050, 3000) ], 5000, 750);
     const sale = await repo.completeSale({ token: 'x2', lines: [{ productId: a, qtyMilli: 2500 }, { productId: b, qtyMilli: 3000 }], discountKobo: 5000,
       payments: [{ method: 'TRANSFER', amount: 100000 }, { method: 'CASH', amount: t.total }], cashier: 'Ada', expectedTotal: t.total });
-    await repo.refund(sale.id!, 'test'); await repo.setPin('4321');
+    await repo.refund(sale.id!, 'test');
     const blob = new Blob([await repo.exportBackup()], { type: 'application/json' });
     const text = await blob.text();                                      // what the file picker path does
     await repo.restoreBackup(text);
     expect(await db.sales.count()).toBe(1); expect((await db.sales.toCollection().first())!.status).toBe('REFUNDED');
-    expect(await repo.checkPin('4321')).toBe(true); expect(await repo.getSetting('store_name')).toBe('Mama Ngozi’s ₦ Store');
+    expect(await repo.getSetting('store_name')).toBe('Mama Ngozi’s ₦ Store');
   });
   it('empty file and web page get specific messages', async () => {
     await expect(repo.restoreBackup('')).rejects.toThrow(/empty/);
