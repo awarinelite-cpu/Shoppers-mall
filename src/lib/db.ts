@@ -20,6 +20,7 @@ export interface Movement {
   reason: string; note?: string; refId?: number; createdAt: number;
 }
 export interface Setting { key: string; value: string }
+export interface Snapshot { date: string; createdAt: number; json: string }
 
 class PosDB extends Dexie {
   products!: Table<Product, number>;
@@ -28,6 +29,7 @@ class PosDB extends Dexie {
   payments!: Table<Payment, number>;
   movements!: Table<Movement, number>;
   settings!: Table<Setting, string>;
+  snapshots!: Table<Snapshot, string>;
   constructor() {
     super('provision_pos');
     // Add new versions below with .upgrade() when the schema changes; never delete user data.
@@ -39,6 +41,8 @@ class PosDB extends Dexie {
       movements: '++id,productId,createdAt',
       settings: 'key'
     });
+    // v2: automatic daily snapshots kept inside the app (safety net against mistakes and bad restores)
+    this.version(2).stores({ snapshots: 'date' });
   }
 }
 export const db = new PosDB();

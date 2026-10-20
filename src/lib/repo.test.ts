@@ -119,4 +119,30 @@ describe('repository', () => {
     await expect(repo.restoreBackup(JSON.stringify(bad))).rejects.toThrow(/inconsistent/);
     expect(await db.products.get(id)).toBeTruthy();
   });
+  it('restore accepts a file with BOM and without a format key', async () => {
+    const id = await mk('Bom', 'bom1', 100, 1000); await sell('bom-s', id, 1000, 100, 100);
+    const o = JSON.parse(await repo.exportBackup()); delete o.format; delete o.version;
+    await repo.restoreBackup('\uFEFF  ' + JSON.stringify(o, null, 2));
+    expect(await db.products.count()).toBe(1); expect(await db.sales.count()).toBe(1);
+  });
+  it('non-backup JSON gives a descriptive error', async () => {
+    await expect(repo.restoreBackup('{"hello":1}')).rejects.toThrow(/not a Provision POS backup.*hello/);
+    await expect(repo.restoreBackup('Product,Qty\nA,1')).rejects.toThrow(/not readable/);
+  });
+  it('daily snapshot once per day, keeps 7, and pre-restore undo works', async () => {
+    expect(await repo.dueDailyDownload()).toBe(false);          // no data yet
+    const id = await mk('Snap', 's1', 100, 1000);
+    await repo.dailySnapshot(); await repo.dailySnapshot();
+    expect((await repo.listSnapshots()).length).toBe(1);
+    expect(await repo.dueDailyDownload()).toBe(true); await repo.markDailyDownload(); expect(await repo.dueDailyDownload()).toBe(false);
+    await repo.setSettings({ auto_backup: '0', last_auto_download: '' }); expect(await repo.dueDailyDownload()).toBe(false);
+    for (let i = 1; i <= 9; i++) await db.snapshots.put({ date: `2020-01-0${i}`, createdAt: i, json: '{}' });
+    await db.snapshots.clear(); for (let i = 1; i <= 9; i++) await db.snapshots.put({ date: `2020-01-0${i}`, createdAt: i, json: '{}' });
+    await repo.dailySnapshot(); expect((await repo.listSnapshots()).length).toBe(7);
+    const json = await repo.exportBackup(); await sell('sn-1', id, 1000, 100, 100);       // stock now 0
+    await repo.restoreBackup(json);                                                          // back to stock 1000
+    expect((await db.products.get(id))!.stockMilli).toBe(1000);
+    await repo.restoreSnapshot('pre-restore');                                               // undo -> stock 0 again
+    expect((await db.products.get(id))!.stockMilli).toBe(0);
+  });
 });

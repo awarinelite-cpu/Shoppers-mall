@@ -178,15 +178,21 @@ export async function exportBackup(): Promise<string> {
 
 /** Validates, then replaces all data in one transaction. Nothing changes if anything fails. */
 export async function restoreBackup(json: string): Promise<string> {
-  let b: any; try { b = JSON.parse(json); } catch { throw new PosError('This file is not a valid backup'); }
-  if (!b || b.format !== 'provision-pos-backup') throw new PosError('This is not a Provision POS backup file');
-  if (b.version > 1) throw new PosError(`Backup was made by a newer app version (v${b.version}). Update the app first.`);
-  for (const k of ['products', 'sales', 'saleItems', 'payments', 'movements', 'settings']) if (!Array.isArray(b[k])) throw new PosError('Backup is incomplete');
+  let b: any;
+  try { b = JSON.parse(json.replace(/^\uFEFF/, '').trim()); }
+  catch { throw new PosError('That file is not readable as a backup. Pick the .json file exported from Provision POS (not a CSV report or receipt).'); }
+  const arr = (k: string) => b && Array.isArray(b[k]);
+  if (!b || typeof b !== 'object' || (b.format !== 'provision-pos-backup' && !(arr('products') && arr('sales'))))
+    throw new PosError(`This is not a Provision POS backup file (it contains: ${b && typeof b === 'object' ? Object.keys(b).slice(0, 6).join(', ') || 'nothing' : typeof b}).`);
+  const ver = b.version ?? 1;
+  if (ver > 1) throw new PosError(`Backup was made by a newer app version (v${ver}). Update the app first.`);
+  for (const k of ['products', 'sales', 'saleItems', 'payments', 'movements', 'settings']) if (!arr(k)) throw new PosError(`Backup is incomplete: "${k}" is missing`);
   const pids = new Set<number>(b.products.map((p: Product) => p.id)), sids = new Set<number>(b.sales.map((s: Sale) => s.id));
   if (pids.size !== b.products.length || sids.size !== b.sales.length) throw new PosError('Backup contains duplicate records');
   if (new Set(b.sales.map((s: Sale) => s.receiptNo)).size !== b.sales.length) throw new PosError('Backup contains duplicate receipt numbers');
   if (b.saleItems.some((i: SaleItem) => !sids.has(i.saleId)) || b.payments.some((p: Payment) => !sids.has(p.saleId))) throw new PosError('Backup is inconsistent (items without a sale)');
   if (b.movements.some((m: Movement) => !pids.has(m.productId))) throw new PosError('Backup is inconsistent (stock movement without a product)');
+  await takeSnapshot('pre-restore');       // undo point: the data being replaced
   await db.transaction('rw', [db.products, db.sales, db.saleItems, db.payments, db.movements, db.settings], async () => {
     await Promise.all([db.products.clear(), db.sales.clear(), db.saleItems.clear(), db.payments.clear(), db.movements.clear(), db.settings.clear()]);
     await db.products.bulkAdd(b.products); await db.sales.bulkAdd(b.sales); await db.saleItems.bulkAdd(b.saleItems);
@@ -196,3 +202,29 @@ export async function restoreBackup(json: string): Promise<string> {
   });
   return `Restored ${b.products.length} products and ${b.sales.length} sales`;
 }
+
+// ---------- automatic snapshots (kept inside the app) ----------
+export const takeSnapshot = async (key: string) => { await db.snapshots.put({ date: key, createdAt: now(), json: await exportBackup() }); };
+const hasData = async () => (await db.products.count()) > 0 || (await db.sales.count()) > 0;
+
+/** Once per calendar day, on first open: keep an in-app copy; the last 7 days are retained. */
+export async function dailySnapshot() {
+  if (!(await hasData())) return;
+  const key = fmtDate(now());
+  if (await db.snapshots.get(key)) return;
+  await takeSnapshot(key);
+  const days = (await db.snapshots.orderBy('date').toArray()).filter((s) => s.date !== 'pre-restore');
+  await db.snapshots.bulkDelete(days.slice(0, -7).map((s) => s.date));
+}
+export const listSnapshots = () => db.snapshots.orderBy('date').reverse().toArray();
+export async function restoreSnapshot(key: string) {
+  const s = await db.snapshots.get(key); if (!s) throw new PosError('Snapshot not found');
+  return restoreBackup(s.json);
+}
+
+/** True when a backup FILE should be downloaded now: auto-backup is on and none was downloaded today. */
+export async function dueDailyDownload(): Promise<boolean> {
+  if ((await getSetting('auto_backup')) === '0' || !(await hasData())) return false;
+  return (await getSetting('last_auto_download')) !== fmtDate(now());
+}
+export const markDailyDownload = () => setSettings({ last_auto_download: fmtDate(now()), last_backup: String(now()) });

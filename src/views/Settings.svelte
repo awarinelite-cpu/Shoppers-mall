@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { setSettings, setPin, exportBackup, restoreBackup } from '../lib/repo';
+  import { setSettings, setPin, exportBackup, restoreBackup, restoreSnapshot, listSnapshots, markDailyDownload } from '../lib/repo';
+  import { liveQuery } from 'dexie';
+  import { db } from '../lib/db';
   import { settings, S, toast, safe, guard, confirmBox } from '../lib/stores';
   import { parseQty, fmtQty, fmtDate, METHODS } from '../lib/money';
   import { download } from '../lib/receipt';
@@ -8,6 +10,13 @@
   let name = S('store_name'), address = S('address'), phone = S('phone'), cashier = S('cashier'), footer = S('footer'), prefix = S('receipt_prefix', 'POS');
   let low = S('low_default', '5'), tax = String((parseInt(S('tax_bps', '0')) || 0) / 100), pay = S('default_pay', 'CASH'), allowNeg = S('allow_negative') === '1';
   let newPin = '', fileInput: HTMLInputElement;
+  let autoBackup = S('auto_backup') !== '0';
+  const snaps = liveQuery(() => db.snapshots.orderBy('date').reverse().toArray());
+  async function toggleAuto() { await setSettings({ auto_backup: autoBackup ? '1' : '0' }); }
+  async function restoreSnap(key: string) {
+    if (!(await confirmBox('Restore this copy?', 'This replaces current data with the in-app copy from ' + key + '. Your current data is kept as an undo copy named pre-restore.', 'Restore'))) return;
+    await guard(async () => { const r = await safe(() => restoreSnapshot(key)); if (r) toast(r); });
+  }
 
   async function save() {
     const t = parseQty(tax), l = parseQty(low);
@@ -18,7 +27,7 @@
   }
   async function savePin() { if (newPin.length < 4) return toast('Use at least 4 digits'); await guard(async () => { await setPin(newPin); newPin = ''; toast('PIN saved'); }); }
   async function removePin() { await guard(async () => { await setPin(null); toast('PIN removed'); }); }
-  async function backup() { const r = await safe(exportBackup); if (r) { download(`provision-pos-backup-${fmtDate(Date.now())}.json`, r, 'application/json'); await setSettings({ last_backup: String(Date.now()) }); toast('Backup downloaded'); } }
+  async function backup() { const r = await safe(exportBackup); if (r) { download(`provision-pos-backup-${fmtDate(Date.now())}.json`, r, 'application/json'); await markDailyDownload(); toast('Backup downloaded'); } }
   async function picked() {
     const f = fileInput.files?.[0]; fileInput.value = ''; if (!f) return;
     const text = await f.text();
@@ -49,7 +58,15 @@
   <h3>Backup & restore</h3>
   <p class="hint">Your data lives only in this browser on this device. If you clear browser data or lose the phone it is gone, so back up often. Last backup: <b>{lastBackup}</b>.
     To move to another phone: open the app there, finish setup, choose Restore and pick the file.</p>
-  <button class="btn" on:click={backup}>Export backup</button>
+  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" bind:checked={autoBackup} on:change={toggleAuto} /> Auto-download a backup file the first time I open the app each day</label>
+  <p class="hint">A web app cannot run while it is closed, so the daily backup happens when you tap Start each morning. Files go to your phone's Downloads folder.
+    Also, the app keeps its own copy of the last 7 days (below). For protection if the phone is lost, move the files to Google Drive/WhatsApp, or ask for cloud sync.</p>
+  <button class="btn" on:click={backup}>Export backup now</button>
   <button class="btn alt" on:click={() => fileInput.click()}>Restore backup</button>
-  <input bind:this={fileInput} type="file" accept=".json,application/json" style="display:none" on:change={picked} />
+  <h3>Copies kept inside the app</h3>
+  {#if !$snaps?.length}<p class="hint">None yet. The first copy is made the next time you open the app.</p>{/if}
+  {#each $snaps ?? [] as sn (sn.date)}
+    <div class="item between" style="align-items:center;cursor:default"><span>{sn.date === 'pre-restore' ? 'Before last restore (undo)' : sn.date}</span><button class="sm" on:click={() => restoreSnap(sn.date)}>Restore</button></div>
+  {/each}
+  <input bind:this={fileInput} type="file" style="display:none" on:change={picked} />
 </main>
