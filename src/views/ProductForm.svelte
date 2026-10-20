@@ -4,6 +4,7 @@
   import { saveProduct } from '../lib/repo';
   import { parseMoney, parseQty, fmtQty, moneyInput, fmtDate, parseDate, UNITS } from '../lib/money';
   import { back, toast, safe, S, settings, go } from '../lib/stores';
+  import { lookupName } from '../lib/barcodeName';
   import { shrinkImage, attachPhoto, photoSrc } from '../lib/photo';
   import Header from './Header.svelte';
   import Scanner from './Scanner.svelte';
@@ -20,6 +21,12 @@
     const el = e.currentTarget as HTMLInputElement;
     const f = el.files?.[0]; el.value = ''; if (!f) return;
     shrinking = true; const r = await safe(() => shrinkImage(f)); shrinking = false; if (r) pending = r;
+  }
+  async function onScanned(c: string) {
+    barcode = c;
+    if (name.trim()) return;                       // never overwrite a name that was already typed
+    const n = await lookupName(c);
+    if (n && !name.trim()) { name = n; toast('Name filled from barcode'); } else if (!n) toast('Name not found. Type it in.');
   }
   function clearPhoto() { pending = ''; photoUrl = undefined; }
 
@@ -76,4 +83,4 @@
     <button class="btn" on:click={save}>Save product</button>
   {/if}
 </main>
-{#if scanning}<Scanner mode="pick" onCode={async (c) => { barcode = c; }} onClose={() => (scanning = false)} />{/if}
+{#if scanning}<Scanner mode="pick" onCode={onScanned} onClose={() => (scanning = false)} />{/if}
