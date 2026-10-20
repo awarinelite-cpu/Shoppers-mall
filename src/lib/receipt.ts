@@ -22,5 +22,12 @@ export function receiptText(s: Record<string, string>, sale: Sale, items: SaleIt
 export function download(name: string, content: string, mime: string) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([content], { type: mime })); a.download = name; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);   // long delay: early revoke can truncate downloads on phones
+}
+
+/** Opens the phone's share sheet with the file attached (WhatsApp, Drive, Bluetooth…). Returns false if unsupported. */
+export async function shareFile(name: string, content: string, mime: string): Promise<boolean> {
+  const f = new File([content], name, { type: mime });
+  if (!navigator.canShare?.({ files: [f] })) return false;
+  try { await navigator.share({ files: [f], title: name }); return true; } catch (e: any) { if (e?.name === 'AbortError') return true; return false; }
 }

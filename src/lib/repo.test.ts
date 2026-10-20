@@ -145,4 +145,24 @@ describe('repository', () => {
     await repo.restoreSnapshot('pre-restore');                                               // undo -> stock 0 again
     expect((await db.products.get(id))!.stockMilli).toBe(0);
   });
+  it('restores a realistic backup (refund, tax, discount, split, PIN) written to a Blob and read back', async () => {
+    await repo.setSettings({ tax_bps: '750', receipt_prefix: 'SHOP', store_name: 'Mama Ngozi’s ₦ Store' });
+    const a = await mk('Garri', undefined, 120000, 20000, null), b = await mk('Soap', 'real2', 35050, 20000, 20000);
+    const s1 = await repo.completeSale({ token: 'x1', lines: [{ productId: a, qtyMilli: 2500 }, { productId: b, qtyMilli: 3000 }], discountKobo: 5000,
+      payments: [{ method: 'TRANSFER', amount: 100000 }, { method: 'CASH', amount: 300000 }], cashier: 'Ada', expectedTotal: 0 }).catch((e) => e);
+    expect(s1).toBeInstanceOf(PosError);                                // wrong expected total is refused
+    const t = (await import('./money')).totals([ (await import('./money')).lineTotal(120000, 2500), (await import('./money')).lineTotal(35050, 3000) ], 5000, 750);
+    const sale = await repo.completeSale({ token: 'x2', lines: [{ productId: a, qtyMilli: 2500 }, { productId: b, qtyMilli: 3000 }], discountKobo: 5000,
+      payments: [{ method: 'TRANSFER', amount: 100000 }, { method: 'CASH', amount: t.total }], cashier: 'Ada', expectedTotal: t.total });
+    await repo.refund(sale.id!, 'test'); await repo.setPin('4321');
+    const blob = new Blob([await repo.exportBackup()], { type: 'application/json' });
+    const text = await blob.text();                                      // what the file picker path does
+    await repo.restoreBackup(text);
+    expect(await db.sales.count()).toBe(1); expect((await db.sales.toCollection().first())!.status).toBe('REFUNDED');
+    expect(await repo.checkPin('4321')).toBe(true); expect(await repo.getSetting('store_name')).toBe('Mama Ngozi’s ₦ Store');
+  });
+  it('empty file and web page get specific messages', async () => {
+    await expect(repo.restoreBackup('')).rejects.toThrow(/empty/);
+    await expect(repo.restoreBackup('<!doctype html><html>')).rejects.toThrow(/web page/);
+  });
 });

@@ -4,7 +4,7 @@
   import { db } from '../lib/db';
   import { settings, S, toast, safe, guard, confirmBox } from '../lib/stores';
   import { parseQty, fmtQty, fmtDate, METHODS } from '../lib/money';
-  import { download } from '../lib/receipt';
+  import { download, shareFile } from '../lib/receipt';
   import Header from './Header.svelte';
 
   let name = S('store_name'), address = S('address'), phone = S('phone'), cashier = S('cashier'), footer = S('footer'), prefix = S('receipt_prefix', 'POS');
@@ -28,12 +28,37 @@
   async function savePin() { if (newPin.length < 4) return toast('Use at least 4 digits'); await guard(async () => { await setPin(newPin); newPin = ''; toast('PIN saved'); }); }
   async function removePin() { await guard(async () => { await setPin(null); toast('PIN removed'); }); }
   async function backup() { const r = await safe(exportBackup); if (r) { download(`provision-pos-backup-${fmtDate(Date.now())}.json`, r, 'application/json'); await markDailyDownload(); toast('Backup downloaded'); } }
-  async function picked() {
-    const f = fileInput.files?.[0]; fileInput.value = ''; if (!f) return;
-    const text = await f.text();
-    if (!(await confirmBox('Replace all data?', 'Restoring REPLACES every product, sale and setting on this device with the backup contents. This cannot be undone.', 'Replace'))) return;
-    await guard(async () => { const r = await safe(() => restoreBackup(text)); if (r) toast(r); });
+  let restoreError = '', pasted = '';
+  async function readFile(f: File): Promise<string> {
+    try { return await f.text(); }
+    catch { return await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsText(f); }); }
   }
+  async function runRestore(text: string, source: string) {
+    restoreError = '';
+    const head = text.replace(/\s+/g, ' ').slice(0, 80);
+    const detail = `${source} · ${text.length} characters · starts with: "${head}"`;
+    try {
+      if (!(await confirmBox('Replace all data?', 'Restoring REPLACES every product, sale and setting on this device with the backup contents. An undo copy is kept.', 'Replace'))) return;
+      await guard(async () => {
+        try { const r = await restoreBackup(text); restoreError = ''; toast(r); }
+        catch (e: any) { restoreError = (e?.message || 'Restore failed') + '\n' + detail; toast('Restore failed. See the red box below.'); }
+      });
+    } catch (e: any) { restoreError = (e?.message || 'Restore failed') + '\n' + detail; }
+  }
+  async function picked() {
+    const f = fileInput.files?.[0]; if (!f) return;
+    let text = '';
+    try { text = await readFile(f); }
+    catch (e: any) { restoreError = `The phone would not let the app read "${f.name}" (${e?.name || 'read error'}). Try the paste option below, or save the file to Downloads and pick it from there.`; return; }
+    finally { fileInput.value = ''; }
+    await runRestore(text, `File "${f.name}" (${f.size} bytes)`);
+  }
+  async function shareBackup() {
+    const r = await safe(exportBackup); if (!r) return;
+    const ok = await shareFile(`provision-pos-backup-${fmtDate(Date.now())}.json`, r, 'application/json');
+    if (ok) await markDailyDownload(); else toast('Sharing files is not supported here. Use Export backup instead.');
+  }
+  async function copyBackup() { const r = await safe(exportBackup); if (r) { try { await navigator.clipboard.writeText(r); toast('Backup text copied. Paste it somewhere safe (e.g. a note or message to yourself).'); } catch { toast('Could not copy'); } } }
   $: lastBackup = $settings?.last_backup ? fmtDate(Number($settings.last_backup)) : 'never';
 </script>
 <Header title="Settings" />
@@ -62,7 +87,13 @@
   <p class="hint">A web app cannot run while it is closed, so the daily backup happens when you tap Start each morning. Files go to your phone's Downloads folder.
     Also, the app keeps its own copy of the last 7 days (below). For protection if the phone is lost, move the files to Google Drive/WhatsApp, or ask for cloud sync.</p>
   <button class="btn" on:click={backup}>Export backup now</button>
+  <button class="btn alt" on:click={shareBackup}>Share backup file (WhatsApp, Drive…)</button>
+  <button class="btn alt" on:click={copyBackup}>Copy backup as text</button>
   <button class="btn alt" on:click={() => fileInput.click()}>Restore backup</button>
+  {#if restoreError}<div class="card" style="border-color:var(--er)"><b class="err">Restore problem</b><pre style="white-space:pre-wrap;word-break:break-word;margin:6px 0 0;font-size:.85rem">{restoreError}</pre></div>{/if}
+  <label for="paste">Or paste backup text here</label>
+  <textarea id="paste" rows="3" bind:value={pasted} placeholder="Paste the backup text"></textarea>
+  <button class="btn alt" disabled={!pasted.trim()} on:click={() => runRestore(pasted, 'Pasted text')}>Restore from pasted text</button>
   <h3>Copies kept inside the app</h3>
   {#if !$snaps?.length}<p class="hint">None yet. The first copy is made the next time you open the app.</p>{/if}
   {#each $snaps ?? [] as sn (sn.date)}

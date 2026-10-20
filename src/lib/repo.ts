@@ -179,8 +179,11 @@ export async function exportBackup(): Promise<string> {
 /** Validates, then replaces all data in one transaction. Nothing changes if anything fails. */
 export async function restoreBackup(json: string): Promise<string> {
   let b: any;
-  try { b = JSON.parse(json.replace(/^\uFEFF/, '').trim()); }
-  catch { throw new PosError('That file is not readable as a backup. Pick the .json file exported from Provision POS (not a CSV report or receipt).'); }
+  const text = json.replace(/^\uFEFF/, '').trim();
+  if (!text) throw new PosError('The file is empty (0 bytes). The backup was not saved properly. Export it again.');
+  if (text.startsWith('<')) throw new PosError('That file is a web page, not a backup. Export the backup again and pick the .json file from your Downloads.');
+  try { b = JSON.parse(text); if (typeof b === 'string') b = JSON.parse(b); }   // also accepts double-encoded text
+  catch { throw new PosError('That file is not readable as a backup (it may be cut off or edited). Pick the .json file exported from Provision POS, not a CSV report or receipt.'); }
   const arr = (k: string) => b && Array.isArray(b[k]);
   if (!b || typeof b !== 'object' || (b.format !== 'provision-pos-backup' && !(arr('products') && arr('sales'))))
     throw new PosError(`This is not a Provision POS backup file (it contains: ${b && typeof b === 'object' ? Object.keys(b).slice(0, 6).join(', ') || 'nothing' : typeof b}).`);
