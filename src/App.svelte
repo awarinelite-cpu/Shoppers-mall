@@ -16,6 +16,9 @@
   import Reports from './views/Reports.svelte';
   import Settings from './views/Settings.svelte';
   import More from './views/More.svelte';
+  import Cover from './views/Cover.svelte';
+  let started = false;
+  function start() { started = true; if (location.hash && location.hash !== '#/') go('/'); }
 
   $: [path, query] = $route.split('?');
   $: seg = path.split('/').filter(Boolean);
@@ -28,6 +31,8 @@
 
 {#if $settings === undefined}
   <p class="empty">Loading…</p>
+{:else if !started}
+  <Cover onStart={start} />
 {:else if $settings.setup_done !== '1'}
   <Setup />
 {:else}
