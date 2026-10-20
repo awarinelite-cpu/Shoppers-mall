@@ -30,6 +30,6 @@ class CalcTest {
     }
     @Test fun splitWithChangeReducesCashOnly() {
         val s = Calc.settle(100000, listOf(PayIn("TRANSFER", 60000), PayIn("CASH", 50000)))
-        assertEquals(10000L, s.change); assertEquals(30000L, s.applied.first { it.method == "CASH" }.amount)
+        assertEquals(10000L, s.change); assertEquals(40000L, s.applied.first { it.method == "CASH" }.amount)
     }
 }

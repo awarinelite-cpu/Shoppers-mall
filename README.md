@@ -1,48 +1,37 @@
-# Provision POS (Android, Kotlin, Compose, Room, CameraX + ML Kit)
+# Provision POS (web app) — Svelte + TypeScript + Dexie (IndexedDB) + ZXing, installable offline PWA
 
-Offline POS, barcode scanner, inventory and reports for a single provision store. Currency: Naira (₦).
+Offline POS, barcode scanner, inventory and reports for one provision store. Currency ₦. No server, no account, no subscription.
 
-## STATUS: source only, NOT yet compiled or run
-This project was written without an Android SDK or access to Google's Maven repository, so it has
-**never been compiled, tested or installed**. Expect a few small compile errors on first build; fix them in Android Studio
-(or send me the error text). No APK exists yet. A source ZIP is not an installable app.
-
-## Build the APK (needs a Windows/Mac/Linux computer)
-1. Install Android Studio (latest stable). It bundles the JDK and offers to install the Android SDK (API 34).
-2. File > Open > select the `ProvisionPOS` folder. Let Gradle sync finish (needs internet once, to download libraries).
-   Android Studio downloads the Gradle wrapper automatically (`gradle-wrapper.jar` is not included).
-3. Build > Build Bundle(s) / APK(s) > Build APK(s). The file is at `app/build/outputs/apk/debug/app-debug.apk`.
-4. Copy it to your phone (USB, WhatsApp to self, Google Drive). Open it; allow "Install unknown apps" for the app you opened it from.
-5. On first launch, tap Allow when asked for camera access (or Android Settings > Apps > Provision POS > Permissions > Camera).
-No computer? Use GitHub Codespaces / Android-capable cloud IDE, or a build service, with this same project.
+## Run / deploy
+```
+npm install --legacy-peer-deps
+npm run dev        # http://localhost:5173 (camera works on localhost)
+npm test           # 26 automated tests
+npm run build      # outputs dist/
+```
+Deploy `dist/` to any static host (Vercel: import the repo, framework preset "Vite", build `npm run build`, output `dist`).
+**The camera needs HTTPS** (Vercel/Netlify/GitHub Pages provide it). Open the live URL once on the phone with internet, then use
+browser menu > "Install app" / "Add to Home screen". After that it works fully offline.
 
 ## Using it
-- First launch: enter store name (others optional) > Start.
-- Add product: Products > + > scan or type barcode, enter cost, price, opening stock > Save. No barcode? leave empty; an internal code (P00001) is generated.
-- Sell: Sale tab > scan icon (continuous; each scan adds 1) or search > Checkout > choose payment (Split payment for mixed) > Complete sale.
-- Receipt: shown after sale; Share as text. Find it later in More > Sales history.
-- Backup: More > Settings & backup > Export backup (choose where to save). Restore on a new phone: install app, finish setup, Restore backup, pick the file.
-- Test a few sales with small items before real use, then refund them (More > Sales history > open sale > Refund).
+Setup (store name) > Products > ＋ (scan or type barcode, cost, price, opening stock) > Sale tab > 📷 Scan (each scan adds 1) or search > Checkout >
+Complete sale > receipt (Share / Print). Reports and backups under More.
 
 ## Architecture
-MVVM. `domain/` (pure money/quantity maths, no Android), `data/` (Room entities, DAOs, `Repository` with all transactions),
-`ui/` (Compose screens + one `AppViewModel`). Money = Long kobo; quantities = Long thousandths (supports kg/litres). Settings live in a Room table so they are in backups.
-- Sale = one `withTransaction`: idempotency token check, re-read price/active/stock, validate payments, insert sale+items+payments, deduct stock, write movements. Any failure rolls everything back.
-- Receipt numbers come from a counter stored in the same transaction (unique after restarts and restores).
-- Refunds mark the sale REFUNDED and restore stock via movements; nothing is deleted.
+`src/lib/money.ts` pure maths (integer kobo, quantities in thousandths) · `db.ts` Dexie schema (v1, add `.version(2)` upgrades later) ·
+`repo.ts` all business rules, each in one IndexedDB transaction · `stores.ts` router/cart/dialogs · `views/` screens.
+A sale (idempotency token, price/active/stock re-check, payment validation, receipt number, stock deduction, movements) commits or rolls back as one unit.
+Refunds mark the sale REFUNDED and restore stock; nothing is deleted. Optional PIN is salted SHA-256.
 
-## Implemented
-Setup, dashboard, scanner (CameraX + ML Kit, torch, manual entry, permission handling, not-found dialog), products (add/edit/deactivate/search),
-stock (adjust, received, damaged, expired, loss, movements, low/out), cart (qty, discount, optional tax), cash/transfer/POS/split payments with change,
-text receipts + share, sales history with filters, full refunds, reports (daily/7-day/month/custom, by method/product/category, gross profit with missing-cost warning, CSV export),
-optional PIN (salted SHA-256), JSON backup/restore with validation.
+## Verified here (automated, Node + fake IndexedDB)
+26 tests pass: money/tax/change/split maths, sale deducts stock, historical price kept, double-submit = one sale, insufficient stock and bad payment roll back,
+stale-price rejection, deactivated product, duplicate barcode, validation, stock adjustments, refund, reports + missing-cost gross profit, PIN, backup round-trip and invalid-backup rejection.
+Type-check (svelte-check) 0 errors; production build and service worker generate successfully.
 
-## Not implemented / limitations
-PDF receipts, Bluetooth thermal printer, credit sales, partial refunds, sample-data mode, dark/light toggle (follows system), barcode label printing, CSV import,
-expiry alerts (expiry date is stored only), PDF report export. Restore replaces all data (no merge). Backup file contains the PIN hash. Database is version 1 (no migrations needed yet; add them in `AppDatabase.MIGRATIONS`).
-Settings use Room rather than DataStore (so they back up with the data).
+## NOT verified (needs a real phone/browser)
+Camera scanning accuracy, torch (only some phones/browsers), install-to-home-screen, offline reload after install, sharing/printing, file download/restore, UI layout on your phone.
 
-## Tests
-- `app/src/test/.../CalcTest.kt` (JVM unit tests: money, totals, tax, change, split): **written, not run**.
-- `app/src/androidTest/.../SaleRepositoryTest.kt` (Room in-memory: stock deduction, price snapshot, double submit, rollback, duplicate barcode, refund, backup round-trip): **written, not run**.
-- Manual on a real phone (all untested): camera permission denial, real scanning, torch, sharing, backup file picker, airplane-mode use.
+## Limitations
+Browser storage can be wiped if you clear site data or the phone is low on space (the app requests persistent storage, but back up regularly). iPhone Safari may clear data of unused sites.
+Not implemented: credit sales, partial refunds, PDF receipts, Bluetooth thermal printing (browser Print only), sample-data mode, expiry alerts (date stored only), multi-device sync.
+Restore replaces all data. Backup file includes the PIN hash.
