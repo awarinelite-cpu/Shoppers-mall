@@ -183,12 +183,14 @@ export async function restoreBackup(json: string): Promise<string> {
   if (b.saleItems.some((i: SaleItem) => !sids.has(i.saleId)) || b.payments.some((p: Payment) => !sids.has(p.saleId))) throw new PosError('Backup is inconsistent (items without a sale)');
   if (b.movements.some((m: Movement) => !pids.has(m.productId))) throw new PosError('Backup is inconsistent (stock movement without a product)');
   await takeSnapshot('pre-restore');       // undo point: the data being replaced
+  const keep = (await db.settings.toArray()).filter((x) => x.key.startsWith('drive_') && x.value);   // this device's Google Drive link survives a restore
   await db.transaction('rw', [db.products, db.sales, db.saleItems, db.payments, db.movements, db.settings], async () => {
     await Promise.all([db.products.clear(), db.sales.clear(), db.saleItems.clear(), db.payments.clear(), db.movements.clear(), db.settings.clear()]);
     await db.products.bulkAdd(b.products); await db.sales.bulkAdd(b.sales); await db.saleItems.bulkAdd(b.saleItems);
     await db.payments.bulkAdd(b.payments); await db.movements.bulkAdd(b.movements); await db.settings.bulkAdd(b.settings);
     const c = Math.max(parseInt(b.settings.find((s: any) => s.key === 'receipt_counter')?.value ?? '0') || 0, b.sales.length);
     await db.settings.put({ key: 'receipt_counter', value: String(c) });
+    if (keep.length) await db.settings.bulkPut(keep);
   });
   return `Restored ${b.products.length} products and ${b.sales.length} sales`;
 }

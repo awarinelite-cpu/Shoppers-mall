@@ -3,8 +3,9 @@
   import { liveQuery } from 'dexie';
   import { db } from '../lib/db';
   import { settings, S, toast, safe, confirmBox } from '../lib/stores';
-  import { parseQty, fmtQty, fmtDate, METHODS } from '../lib/money';
+  import { parseQty, fmtQty, fmtDate, fmtDateTime, METHODS } from '../lib/money';
   import { download, shareFile } from '../lib/receipt';
+  import { backupToDrive, listDriveBackups, downloadDriveBackup, folderLink, resetDriveSession, type DriveFile } from '../lib/drive';
   import Header from './Header.svelte';
 
   let name = S('store_name'), address = S('address'), phone = S('phone'), cashier = S('cashier'), footer = S('footer'), prefix = S('receipt_prefix', 'POS');
@@ -27,6 +28,24 @@
   }
   async function backup() { const r = await safe(exportBackup); if (r) { download(`provision-pos-backup-${fmtDate(Date.now())}.json`, r, 'application/json'); await markDailyDownload(); toast('Backup downloaded'); } }
   let restoreError = '', pasted = '';
+  let driveEmail = S('drive_email'), clientId = S('drive_client_id'), driveBusy = false, driveFiles: DriveFile[] | null = null;
+  $: driveOn = $settings?.drive_enabled === '1';
+  $: driveFolder = $settings?.drive_folder_id ? folderLink($settings.drive_folder_id) : '';
+  async function saveDrive() {
+    if (driveEmail.trim() && !/^\S+@\S+\.\S+$/.test(driveEmail.trim())) return toast('Enter a valid Google email');
+    resetDriveSession(); await setSettings({ drive_email: driveEmail.trim(), drive_client_id: clientId.trim() }); toast('Drive details saved');
+  }
+  async function driveNow() {
+    if (!driveEmail.trim() || !clientId.trim()) return toast('Enter your Google email and Client ID first');
+    await saveDrive(); driveBusy = true;
+    const r = await safe(() => backupToDrive(true)); driveBusy = false;
+    if (r) toast('Saved to Google Drive: ' + r.name);
+  }
+  async function disconnectDrive() { resetDriveSession(); await setSettings({ drive_enabled: '0' }); toast('Daily Drive backup turned off'); }
+  async function loadDriveList() { driveBusy = true; const r = await safe(listDriveBackups); driveBusy = false; if (r) driveFiles = r; }
+  async function restoreFromDrive(f: DriveFile) {
+    const text = await safe(() => downloadDriveBackup(f.id)); if (text !== undefined) await runRestore(text, `Google Drive file "${f.name}"`);
+  }
   async function readFile(f: File): Promise<string> {
     try { return await f.text(); }
     catch { return await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsText(f); }); }
@@ -71,13 +90,36 @@
   <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" bind:checked={allowNeg} /> Allow selling below zero stock</label>
   <button class="btn" on:click={save}>Save settings</button>
 
+  <h3>Google Drive backup</h3>
+  <p class="hint">Backups go straight to your Google Drive (folder “Provision POS Backups”), not to the phone. Needs internet at backup time.</p>
+  <label for="de">Google account email (the Drive that should receive backups)</label><input id="de" type="email" bind:value={driveEmail} placeholder="you@gmail.com" />
+  <label for="ci">Google Client ID</label><input id="ci" bind:value={clientId} placeholder="123456-abc.apps.googleusercontent.com" />
+  <details class="hint"><summary>How to get the Client ID (one time, about 5 minutes)</summary>
+    <ol style="padding-left:18px">
+      <li>Open console.cloud.google.com, create a project, and enable “Google Drive API”.</li>
+      <li>APIs & Services &gt; OAuth consent screen: User type External, fill the app name, add your Drive email under “Test users”.</li>
+      <li>Credentials &gt; Create credentials &gt; OAuth client ID &gt; Web application.</li>
+      <li>Under “Authorized JavaScript origins” add this site's address ({location.origin}).</li>
+      <li>Copy the Client ID into the box above, tap the button below, and approve. Google may say the app is unverified: choose Continue.</li>
+    </ol></details>
+  <button class="btn" disabled={driveBusy} on:click={driveNow}>{driveBusy ? 'Working…' : driveOn ? 'Back up to Drive now' : 'Connect Drive & back up now'}</button>
+  <button class="btn alt" on:click={saveDrive}>Save Drive details</button>
+  {#if driveOn}
+    <p class="hint">✓ Daily backups go to Drive{$settings?.drive_last_upload ? ' · last: ' + fmtDateTime(Number($settings.drive_last_upload)) : ''}.
+      {#if driveFolder}<a href={driveFolder} target="_blank" rel="noopener">Open Drive folder</a>{/if}</p>
+    <button class="btn alt" on:click={disconnectDrive}>Turn off Drive backups</button>
+    <button class="btn alt" disabled={driveBusy} on:click={loadDriveList}>Restore from Drive…</button>
+    {#if driveFiles}{#if !driveFiles.length}<p class="hint">No backups in the Drive folder yet.</p>{/if}
+      {#each driveFiles as f (f.id)}<div class="item between" style="align-items:center;cursor:default"><span>{f.name}</span><button class="sm" on:click={() => restoreFromDrive(f)}>Restore</button></div>{/each}{/if}
+  {/if}
+
   <h3>Backup & restore</h3>
   <p class="hint">Your data lives only in this browser on this device. If you clear browser data or lose the phone it is gone, so back up often. Last backup: <b>{lastBackup}</b>.
     To move to another phone: open the app there, finish setup, choose Restore and pick the file.</p>
-  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" bind:checked={autoBackup} on:change={toggleAuto} /> Auto-download a backup file the first time I open the app each day</label>
-  <p class="hint">A web app cannot run while it is closed, so the daily backup happens when you tap Start each morning. Files go to your phone's Downloads folder.
+  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" bind:checked={autoBackup} on:change={toggleAuto} /> Automatic daily backup (to Google Drive if connected, otherwise to the phone) the first time I open the app each day</label>
+  <p class="hint">A web app cannot run while it is closed, so the daily backup happens when you tap Start each morning. Without Drive, files go to your phone's Downloads folder.
     Also, the app keeps its own copy of the last 7 days (below). For protection if the phone is lost, move the files to Google Drive/WhatsApp, or ask for cloud sync.</p>
-  <button class="btn" on:click={backup}>Export backup now</button>
+  <button class="btn" on:click={backup}>Save backup file to phone (manual)</button>
   <button class="btn alt" on:click={shareBackup}>Share backup file (WhatsApp, Drive…)</button>
   <button class="btn alt" on:click={copyBackup}>Copy backup as text</button>
   <button class="btn alt" on:click={() => fileInput.click()}>Restore backup</button>

@@ -35,3 +35,9 @@ Camera scanning accuracy, torch (only some phones/browsers), install-to-home-scr
 Browser storage can be wiped if you clear site data or the phone is low on space (the app requests persistent storage, but back up regularly). iPhone Safari may clear data of unused sites.
 Not implemented: credit sales, partial refunds, PDF receipts, Bluetooth thermal printing (browser Print only), sample-data mode, expiry alerts (date stored only), multi-device sync.
 Restore replaces all data. 
+
+## Google Drive backup (optional)
+Settings > Google Drive backup. Enter your Drive email + a Google OAuth **Client ID** (Web application; add the site URL under Authorized JavaScript origins; enable the Drive API;
+add your email as a Test user). The app uploads to a folder it creates, "Provision POS Backups", using the `drive.file` scope (it can only see files it created). It cannot upload into a
+folder you made by hand. Sign-in tokens last about 1 hour and there is no server to refresh them, so the daily upload runs when you tap Start (Google may flash a sign-in window).
+Tested only against a simulated Drive API in unit tests; not tested against real Google.

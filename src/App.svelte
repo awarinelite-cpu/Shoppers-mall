@@ -21,14 +21,19 @@
   import { onMount } from 'svelte';
   import { removeLegacyPin, dailySnapshot, dueDailyDownload, markDailyDownload, exportBackup } from './lib/repo';
   import { download } from './lib/receipt';
+  import { driveReady, backupToDrive } from './lib/drive';
   import { fmtDate, } from './lib/money';
   import { toast } from './lib/stores';
   onMount(() => { removeLegacyPin().catch(() => {}); dailySnapshot().catch(() => {}); });
   async function start() {
     started = true; if (location.hash && location.hash !== '#/') go('/');
-    // The tap on Start is the user gesture browsers require before a file download.
+    // The tap on Start is the user gesture browsers need for downloads and Google's sign-in popup.
     try {
-      if (await dueDailyDownload()) {
+      if (!(await dueDailyDownload())) return;
+      if (await driveReady()) {
+        try { const r = await backupToDrive(true); toast('Backup saved to Google Drive (' + r.name + ')'); }
+        catch (e: any) { toast('Drive backup failed: ' + (e?.message ?? 'unknown error') + ' Open Settings > Back up to Drive now.'); }
+      } else {
         download(`provision-pos-backup-${fmtDate(Date.now())}.json`, await exportBackup(), 'application/json');
         await markDailyDownload(); toast('Daily backup saved to your Downloads');
       }
