@@ -2,6 +2,7 @@ plugins { id 'com.android.application' }
 
 // The website the app opens. One line in twa/host.txt (no https://, no slash).
 def host = new File(rootDir, 'host.txt').text.trim()
+def buildNumber = Integer.parseInt(System.getenv('VERSION_CODE') ?: '1')
 
 android {
     namespace 'com.provisionpos.app'
@@ -10,7 +11,7 @@ android {
         applicationId 'com.provisionpos.app'
         minSdk 23
         targetSdk 34
-        versionCode (System.getenv('VERSION_CODE') ?: '1').toInteger()
+        versionCode buildNumber
         versionName '1.0'
         manifestPlaceholders = [hostName: host]
         resValue 'string', 'asset_statements',
