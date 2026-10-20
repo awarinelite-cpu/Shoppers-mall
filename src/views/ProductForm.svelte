@@ -6,13 +6,12 @@
   import { back, toast, safe, S, settings, go } from '../lib/stores';
   import { shrinkImage, attachPhoto, photoSrc } from '../lib/photo';
   import Header from './Header.svelte';
-  import Scanner from './Scanner.svelte';
 
   export let id: number | null;
   export let barcode = '';
   let loaded = id === null;
   let name = '', alt = '', internal = '', category = '', cost = '', price = '', stock = '0', low = S('low_default', '5'), unit = 'PIECE';
-  let supplier = '', description = '', expiry = '', scanning = false;
+  let supplier = '', description = '', expiry = '';
   let photoUrl: string | undefined, pending = '', fileEl: HTMLInputElement, camEl: HTMLInputElement, shrinking = false;
   $: hostingReady = !!($settings?.photo_cloud && $settings?.photo_preset);
   $: preview = pending || (photoUrl ? photoSrc(photoUrl, 400) : '');
@@ -64,16 +63,7 @@
       <p class="hint">To add photos, first set up photo hosting: <a href="#/settings" on:click|preventDefault={() => go('/settings')}>Settings › Product photos</a> (free, one time).</p>
     {/if}
     <label for="n">Product name *</label><input id="n" bind:value={name} />
-    <label for="bc">Barcode (leave empty to use an internal code)</label>
-    <div class="row"><input id="bc" bind:value={barcode} inputmode="numeric" /><button class="sm fit" style="padding:14px" on:click={() => (scanning = true)}>📷</button></div>
-    <label for="al">Alternative barcode (optional)</label><input id="al" bind:value={alt} />
-    <label for="ic">Internal code (auto if empty)</label><input id="ic" bind:value={internal} />
     <label for="pr">Selling price ₦ *</label><input id="pr" bind:value={price} inputmode="decimal" />
-    <div class="row">
-      <div><label for="lo">Low-stock level</label><input id="lo" bind:value={low} inputmode="decimal" /></div>
-    </div>
-    {#if id !== null}<p class="hint">Change stock with Stock → Adjust so the history stays correct.</p>{/if}
     <button class="btn" on:click={save}>Save product</button>
   {/if}
 </main>
-{#if scanning}<Scanner mode="pick" onCode={async (c) => { barcode = c; }} onClose={() => (scanning = false)} />{/if}
