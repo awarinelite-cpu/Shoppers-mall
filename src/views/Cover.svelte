@@ -24,9 +24,9 @@
 
 <style>
   .cover { position: fixed; inset: 0; overflow: hidden; color: #fff; z-index: 20; display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(155deg, #0e4a28 0%, #1b6b3a 45%, #2f9a58 100%); padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom); }
+    background: linear-gradient(155deg, #0a1c19 0%, #122d29 50%, #1d4a41 100%); padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom); }
   .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .35; animation: float 12s ease-in-out infinite; }
-  .b1 { width: 320px; height: 320px; background: #7fd69a; top: -90px; right: -90px; }
+  .b1 { width: 320px; height: 320px; background: #f2b83b; top: -90px; right: -90px; }
   .b2 { width: 280px; height: 280px; background: #f5c542; bottom: -100px; left: -80px; animation-delay: -6s; opacity: .22; }
   .content { position: relative; width: 100%; max-width: 420px; text-align: center; animation: rise .7s ease-out both; }
   .logo { position: relative; width: 132px; height: 132px; margin: 0 auto 22px; border-radius: 34px; background: rgba(255,255,255,.14);
@@ -38,7 +38,7 @@
   .tag { margin: 0 0 22px; opacity: .9; letter-spacing: 2px; font-size: .85rem; text-transform: uppercase; }
   .feats { list-style: none; padding: 0; margin: 0 0 30px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
   .feats li { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25); padding: 7px 12px; border-radius: 20px; font-size: .85rem; }
-  .start { width: 100%; padding: 18px; font: inherit; font-size: 1.15rem; font-weight: 800; color: #0e4a28; background: #fff; border: 0; border-radius: 18px;
+  .start { width: 100%; padding: 18px; font: inherit; font-size: 1.15rem; font-weight: 800; color: #122d29; background: #f2b83b; border: 0; border-radius: 18px;
     box-shadow: 0 12px 28px rgba(0,0,0,.28); cursor: pointer; transition: transform .15s; }
   .start:active { transform: scale(.97); }
   .foot { margin: 16px 0 0; font-size: .8rem; opacity: .8; }

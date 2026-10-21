@@ -73,7 +73,7 @@ service cloud.firestore {
         <li>Firestore &gt; Rules: replace everything with the rules below and Publish. They let only your own signed-in account read or write your data.</li>
         <li>On the <b>first</b> phone tap “Create account & connect”, choosing an email and password. On every other phone use the same config and “Sign in & connect”.</li>
       </ol>
-      <pre style="white-space:pre-wrap;font-size:.8rem;background:#f1f1f1;padding:8px;border-radius:8px">{RULES}</pre>
+      <pre style="white-space:pre-wrap;font-size:.8rem;background:var(--card);color:var(--tx);padding:8px;border-radius:8px">{RULES}</pre>
       <button class="sm" on:click={copyRules}>Copy rules</button>
     </details>
   {/if}

@@ -9,7 +9,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: {
         name: 'Provision POS', short_name: 'Provision POS', description: 'Offline POS, barcode scanner and inventory',
-        display: 'standalone', start_url: '/', scope: '/', theme_color: '#1b6b3a', background_color: '#ffffff',
+        display: 'standalone', start_url: '/', scope: '/', theme_color: '#122d29', background_color: '#122d29',
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
