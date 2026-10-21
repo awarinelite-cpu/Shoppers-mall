@@ -50,18 +50,28 @@ export function parseFirebaseConfig(text: string): FirebaseConfig {
   return out as FirebaseConfig;
 }
 
+/** Loads the Firebase code. If this page is an old version (its file was replaced by an update), reload once to get the new one. */
+async function loadRemoteModule() {
+  try { return await import('./firebaseRemote'); }
+  catch (e) {
+    let again = true; try { again = !sessionStorage.getItem('reloaded-for-update'); sessionStorage.setItem('reloaded-for-update', '1'); } catch { /* ignore */ }
+    if (again && typeof location !== 'undefined') { try { await (await navigator.serviceWorker?.getRegistration())?.update(); } catch { /* ignore */ } location.reload(); }
+    throw new PosError('The app was updated. Reloading to the newest version, then tap connect again.');
+  }
+}
+
 async function getRemote(): Promise<Remote> {
   if (injected) return injected;
   const text = (await getSetting('sync_config')) ?? '';
   if (!text && real) return real.remote;                  // mid-connect: signed in, config not saved yet
   if (!text) throw new PosError('Cloud sync is not set up yet. Paste your Firebase config in Settings.');
   if (real && real.key === text) return real.remote;
-  const { createFirebaseRemote } = await import('./firebaseRemote');   // loaded only when sync is used
+  const { createFirebaseRemote } = await loadRemoteModule();   // loaded only when sync is used
   real = { key: text, remote: await createFirebaseRemote(parseFirebaseConfig(text)) };
   return real.remote;
 }
 export async function firebaseAuth(mode: 'signin' | 'signup', configText: string, email: string, password: string) {
-  const { createFirebaseRemote } = await import('./firebaseRemote');
+  const { createFirebaseRemote } = await loadRemoteModule();
   const r = await createFirebaseRemote(parseFirebaseConfig(configText)) as Remote & { signIn(m: 'signin' | 'signup', e: string, p: string): Promise<void>; signOut(): Promise<void> };
   await r.signIn(mode, email, password);
   real = { key: configText, remote: r };
