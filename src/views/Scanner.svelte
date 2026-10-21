@@ -43,10 +43,30 @@
     if (caps.focusMode?.includes?.('continuous')) adv.focusMode = 'continuous';
     if (caps.exposureMode?.includes?.('continuous')) adv.exposureMode = 'continuous';
     if (caps.whiteBalanceMode?.includes?.('continuous')) adv.whiteBalanceMode = 'continuous';
-    if (caps.exposureCompensation && dark) {                       // raise exposure by ~60% of the allowed range
-      const { min, max } = caps.exposureCompensation; adv.exposureCompensation = min + (max - min) * 0.8;
-    }
+    if (caps.exposureCompensation) adv.exposureCompensation = 0;    // start neutral; adjustExposure() steers it from there
     if (Object.keys(adv).length) { try { await track.applyConstraints({ advanced: [adv] }); } catch { /* not supported: ignore */ } }
+  }
+
+  /** Steers exposure up or down so the picture never blows out (torch at close range) or stays too dark. */
+  let expBusy = false;
+  async function adjustExposure(mean: number) {
+    const track = stream?.getVideoTracks()[0]; if (!track || expBusy) return;
+    const tooBright = mean > 175, tooDark = mean < 70 && !torchOn;
+    if (!tooBright && !tooDark) return;
+    expBusy = true;
+    try {
+      const caps: any = track.getCapabilities?.() ?? {}, cur: any = track.getSettings?.() ?? {};
+      if (caps.exposureCompensation) {
+        const { min, max } = caps.exposureCompensation, step = (max - min) / 8 || 0.5;
+        const v = Math.min(max, Math.max(min, (cur.exposureCompensation ?? 0) + (tooBright ? -step * (mean > 215 ? 2 : 1) : step)));
+        await track.applyConstraints({ advanced: [{ exposureCompensation: v } as any] });
+      } else if (caps.exposureTime && cur.exposureTime) {            // phones without compensation: shorten/lengthen the exposure time
+        const { min, max } = caps.exposureTime;
+        const v = Math.min(max, Math.max(min, cur.exposureTime * (tooBright ? (mean > 215 ? 0.4 : 0.65) : 1.5)));
+        await track.applyConstraints({ advanced: [{ exposureMode: 'manual', exposureTime: v } as any] });
+      }
+    } catch { /* not supported: ignore */ }
+    expBusy = false;
   }
 
   onMount(async () => {
@@ -92,6 +112,7 @@
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const st = measure(img.data);
+          if (tick % 4 === 0) adjustExposure(st.mean);
           let code = await decode();                               // 1st try: the picture as it is
           if (!code && st.weak) {                                  // dark or flat picture: clean it up and try again
             enhance(img.data); ctx.putImageData(img, 0, 0); code = await decode();
@@ -114,7 +135,14 @@
 
   async function toggleTorch() {
     const track = (video.srcObject as MediaStream | null)?.getVideoTracks()[0]; if (!track) return;
-    try { torchOn = !torchOn; await track.applyConstraints({ advanced: [{ torch: torchOn } as any] }); } catch { torchOn = false; }
+    try {
+      torchOn = !torchOn; await track.applyConstraints({ advanced: [{ torch: torchOn } as any] });
+      const caps: any = track.getCapabilities?.() ?? {};
+      if (torchOn && caps.exposureCompensation) {                    // torch adds a lot of light: start low so the barcode is not washed out
+        const { min, max } = caps.exposureCompensation;
+        await track.applyConstraints({ advanced: [{ exposureCompensation: min + (max - min) * 0.25 } as any] });
+      } else if (!torchOn && caps.exposureCompensation) await track.applyConstraints({ advanced: [{ exposureCompensation: 0 } as any] });
+    } catch { /* keep going */ }
   }
   async function submitManual() {
     const c = manualText.trim(); manual = false; manualText = '';
