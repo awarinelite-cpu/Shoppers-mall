@@ -53,6 +53,7 @@ export function parseFirebaseConfig(text: string): FirebaseConfig {
 async function getRemote(): Promise<Remote> {
   if (injected) return injected;
   const text = (await getSetting('sync_config')) ?? '';
+  if (!text && real) return real.remote;                  // mid-connect: signed in, config not saved yet
   if (!text) throw new PosError('Cloud sync is not set up yet. Paste your Firebase config in Settings.');
   if (real && real.key === text) return real.remote;
   const { createFirebaseRemote } = await import('./firebaseRemote');   // loaded only when sync is used
