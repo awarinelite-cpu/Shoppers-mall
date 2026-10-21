@@ -1,8 +1,7 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
-  import { db } from '../lib/db';
   import { report } from '../lib/repo';
-  import { dayRange, fmtMoney, fmtQty, fmtDateTime } from '../lib/money';
+  import { dayRange, fmtMoney, fmtQty } from '../lib/money';
   import { settings, go } from '../lib/stores';
   import { syncStatus, syncLabel, pendingCount } from '../lib/sync';
   import Header from '../views/Header.svelte';
@@ -10,7 +9,6 @@
   const today = liveQuery(() => { const [f, t] = dayRange(0); return report(f, t); });
   const pending = liveQuery(() => pendingCount());
   $: cloud = $settings?.sync_enabled === '1' ? syncLabel($syncStatus, $pending ?? 0) : '';
-  const recent = liveQuery(() => db.sales.orderBy('createdAt').reverse().limit(5).toArray());
 </script>
 <Header title={$settings?.store_name || 'Provision POS'} canBack={false} />
 <main>
@@ -24,14 +22,7 @@
     <div class="grid2">
       <div class="stat"><div class="l">Total sales</div><div class="v">{fmtMoney($today.totalSales)}</div></div>
       <div class="stat"><div class="l">Transactions</div><div class="v">{$today.saleCount}</div></div>
-      <div class="stat"><div class="l">Items sold</div><div class="v">{fmtQty($today.itemsMilli)}</div></div>
     </div>
+    <div class="stat"><div class="l">Items sold</div><div class="v">{fmtQty($today.itemsMilli)}</div></div>
   {/if}
-  <h3>Recent sales</h3>
-  {#if !$recent?.length}<p class="empty">No sales yet. Tap “Scan & sell” to make your first sale.</p>{/if}
-  {#each $recent ?? [] as s (s.id)}
-    <div class="item" on:click={() => go('/receipt/' + s.id)} role="button" tabindex="0" on:keydown={(e) => e.key === 'Enter' && go('/receipt/' + s.id)}>
-      <div class="t">{s.receiptNo} · {fmtMoney(s.total)}</div><div class="sub">{fmtDateTime(s.createdAt)}{s.status === 'REFUNDED' ? ' · refunded' : ''}</div>
-    </div>
-  {/each}
 </main>
