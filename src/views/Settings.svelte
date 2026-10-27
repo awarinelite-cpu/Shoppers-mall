@@ -146,7 +146,6 @@
   <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" bind:checked={autoBackup} on:change={toggleAuto} /> Automatic daily backup (to Google Drive if connected, otherwise to the phone) the first time I open the app each day</label>
   <p class="hint">A web app cannot run while it is closed, so the daily backup happens when you tap Start each morning. Without Drive, files go to your phone's Downloads folder.
     Also, the app keeps its own copy of the last 7 days (below). For protection if the phone is lost, move the files to Google Drive/WhatsApp, or ask for cloud sync.</p>
-  <button class="btn" on:click={backup}>Save backup file to phone (manual)</button>
   <button class="btn alt" on:click={shareBackup}>Share backup file (WhatsApp, Drive…)</button>
   <button class="btn alt" on:click={copyBackup}>Copy backup as text</button>
   <button class="btn alt" on:click={() => fileInput.click()}>Restore backup</button>
