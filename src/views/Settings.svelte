@@ -140,23 +140,9 @@
       {#each driveFiles as f (f.id)}<div class="item between" style="align-items:center;cursor:default"><span>{f.name}</span><button class="sm" on:click={() => restoreFromDrive(f)}>Restore</button></div>{/each}{/if}
   {/if}
 
-  <h3>Backup & restore</h3>
-  <p class="hint">Your data lives only in this browser on this device. If you clear browser data or lose the phone it is gone, so back up often. Last backup: <b>{lastBackup}</b>.
-    To move to another phone: open the app there, finish setup, choose Restore and pick the file.</p>
-  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" bind:checked={autoBackup} on:change={toggleAuto} /> Automatic daily backup (to Google Drive if connected, otherwise to the phone) the first time I open the app each day</label>
-  <p class="hint">A web app cannot run while it is closed, so the daily backup happens when you tap Start each morning. Without Drive, files go to your phone's Downloads folder.
-    Also, the app keeps its own copy of the last 7 days (below). For protection if the phone is lost, move the files to Google Drive/WhatsApp, or ask for cloud sync.</p>
-  <button class="btn alt" on:click={shareBackup}>Share backup file (WhatsApp, Drive…)</button>
-  <button class="btn alt" on:click={copyBackup}>Copy backup as text</button>
-  <button class="btn alt" on:click={() => fileInput.click()}>Restore backup</button>
-  {#if restoreError}<div class="card" style="border-color:var(--er)"><b class="err">Restore problem</b><pre style="white-space:pre-wrap;word-break:break-word;margin:6px 0 0;font-size:.85rem">{restoreError}</pre></div>{/if}
-  <label for="paste">Or paste backup text here</label>
-  <textarea id="paste" rows="3" bind:value={pasted} placeholder="Paste the backup text"></textarea>
-  <button class="btn alt" disabled={!pasted.trim()} on:click={() => runRestore(pasted, 'Pasted text')}>Restore from pasted text</button>
   <h3>Copies kept inside the app</h3>
   {#if !$snaps?.length}<p class="hint">None yet. The first copy is made the next time you open the app.</p>{/if}
   {#each $snaps ?? [] as sn (sn.date)}
     <div class="item between" style="align-items:center;cursor:default"><span>{sn.date === 'pre-restore' ? 'Before last restore (undo)' : sn.date}</span><button class="sm" on:click={() => restoreSnap(sn.date)}>Restore</button></div>
   {/each}
-  <input bind:this={fileInput} type="file" style="display:none" on:change={picked} />
 </main>
